@@ -1,0 +1,26 @@
+{
+  "name": "1on1",
+  "version": "1.0.0",
+  "description": "its a fullstack application named 1on1 which developing by Teja Mallam",
+  "main": "index.js",
+  "scripts": {
+    "preinstall": "pnpm dlx only-allow pnpm",
+    "dev:backend": "pnpm --filter 1on1-backend run dev",
+    "dev:frontend": "pnpm --filter 1on1-frontend run dev",
+    "dev": "concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\""
+  },
+  "keywords": ["1on1","Teja Mallam"],
+  "author": "Teja Mallam",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.5.2",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
