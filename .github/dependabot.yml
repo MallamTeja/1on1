@@ -3,9 +3,59 @@
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
+#
+# ANNOTATED. The comments below explain each key. No value has been changed --
+# this file intentionally documents the repository's CURRENT state.
+# Full explanation and the corrected configuration for this repo:
+#   docs/code/07-ci-and-security.md  (section 4)
+
+# Schema version of this file. Dependabot only supports version 2.
 version: 2
+
+# A list of things to keep updated. One entry per (ecosystem, directory) pair.
 updates:
+  # ===========================================================================
+  # WARNING -- BROKEN AS WRITTEN.
+  #
+  # `package-ecosystem` is REQUIRED and must be one of Dependabot's known
+  # ecosystem identifiers. It is currently an empty string (""), which matches
+  # no ecosystem. Dependabot therefore reports a configuration error for this
+  # repository (Insights > Dependency graph > Dependabot) and will NEVER open a
+  # version-update pull request. The trailing "See documentation for possible
+  # values" comment is the unfilled placeholder from GitHub's web-UI template
+  # (added in commit 36af1bf and untouched since).
+  #
+  # The correct value for this repo is "npm". Dependabot's npm ecosystem covers
+  # npm, Yarn, pnpm and Bun; this repo is a pnpm workspace (pnpm-lock.yaml +
+  # pnpm-workspace.yaml) and Dependabot picks the pnpm resolver from the
+  # lockfile. There is no separate "pnpm" value.
+  #
+  # Left unchanged on purpose -- fixing it is a separate, deliberate commit.
+  # The corrected multi-directory config (root + frontend + backend, plus the
+  # github-actions ecosystem for .github/workflows/) is in
+  # docs/code/07-ci-and-security.md.
+  # ===========================================================================
+  # Which package manager / manifest format Dependabot should update.
   - package-ecosystem: "" # See documentation for possible values
+
+    # Directory, relative to the repository root, holding the package manifest.
+    # NOTE: "/" is the ROOT package.json only (which depends on `concurrently`
+    # and nothing else). It does NOT cover frontend/package.json or
+    # backend/package.json, where every real dependency lives. Use the plural
+    # `directories:` key, or additional `updates:` entries, to cover them.
     directory: "/" # Location of package manifests
+
+    # How often Dependabot checks for new versions.
     schedule:
+      # "daily" | "weekly" | "monthly".
+      # "daily" on a repo this size produces a steady drip of unreviewed PRs;
+      # "weekly" combined with `groups:` is usually the better default.
       interval: "daily"
+
+    # Not set here, worth knowing about (see docs/code/07-ci-and-security.md):
+    #   open-pull-requests-limit: cap on concurrent version-update PRs
+    #                             (defaults to 5; 0 pauses version updates).
+    #   groups:                   collapse related bumps into one PR -- also
+    #                             required for correctness where packages must
+    #                             move together (react + react-dom, vite +
+    #                             @vitejs/*).

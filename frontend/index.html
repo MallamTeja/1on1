@@ -1,12 +1,102 @@
 <!doctype html>
+<!--
+  frontend/index.html
+  ===================
+  THE REAL ENTRY POINT OF THE APPLICATION.
+
+  With Vite, the HTML file - not a JavaScript file - is the entry point. Both the
+  dev server (`vite`) and the production build (`vite build`) start by parsing THIS
+  file, then follow every <script src="..."> and <link href="..."> it contains in
+  order to discover the JavaScript module graph.
+  So main.jsx is NOT the entry point; it is only reachable *because* the <script>
+  tag at the bottom of <body> points at it.
+
+  Served at : http://localhost:3000/ in dev (port is set in frontend/vite.config.js).
+  Renders   : nothing of its own - just an empty <div id="root"> that React fills in.
+  Related   : frontend/main.jsx            (finds #root and mounts React into it)
+              frontend/app.jsx             (the root React component)
+              frontend/src/pages/login.css (imported from JS, NOT <link>ed here)
+
+  `lang="en"` tells screen readers and the browser's translate/spellcheck engines
+  that the document text is English.
+-->
 <html lang="en">
   <head>
+    <!--
+      Character encoding. Must be declared inside the first 1024 bytes of the
+      document, which is why it is the very first tag in <head>. UTF-8 is what
+      lets non-ASCII characters (curly quotes, emoji, accented names) render
+      correctly instead of turning into mojibake.
+    -->
     <meta charset="UTF-8" />
+    <!--
+      VIEWPORT META - this is load-bearing for the responsive layout.
+
+      Without it, a mobile browser pretends the screen is ~980 CSS pixels wide and
+      then zooms the whole page out to fit. That fake width means CSS media queries
+      compare against 980px, not the real device width.
+
+      `width=device-width`  -> the CSS viewport equals the device's actual width.
+      `initial-scale=1.0`   -> start at 100% zoom, no shrink-to-fit.
+
+      Concretely: frontend/src/pages/login.css contains
+
+          @media (min-width: 768px) { .login-illustration-section { display: flex; } }
+
+      `.login-illustration-section` is `display: none` by default, so the green SVG
+      illustration panel only appears on screens >= 768px. Delete this meta tag and a
+      360px phone would report itself as 980px wide, the media query would match, and
+      the phone would render the two-column desktop card zoomed out to unreadable size.
+    -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Text shown in the browser tab / window title bar / bookmark name. -->
     <title>1on1 App</title>
   </head>
   <body>
+    <!--
+      THE MOUNT NODE.
+
+      This div is intentionally empty in the source. At runtime
+      frontend/main.jsx does `document.getElementById('root')` to find it and
+      hands it to React's `createRoot(...)`. Everything you see on screen -
+      the login card, the form, the SVG illustration - is DOM that React creates
+      and appends inside this element.
+
+      Because the div starts empty, this is a client-side-rendered (CSR) app:
+      view-source shows a blank page, and nothing renders until the JS bundle
+      has downloaded and executed. The id "root" is a convention, not a rule -
+      but it MUST match the string in main.jsx or React throws
+      "Target container is not a DOM element".
+    -->
     <div id="root"></div>
+    <!--
+      THE SCRIPT THAT BOOTS REACT.
+
+      type="module"
+        Loads the file as a native ES module, which is what makes `import` /
+        `export` syntax legal in the browser. Vite requires this because it does
+        not bundle during development at all: it serves each source file as a
+        separate ES module over HTTP and lets the browser's own module loader
+        resolve the import graph. That is why the dev server starts instantly no
+        matter how large the project is. `type="module"` also implies `defer`
+        (execution waits until the HTML is parsed), which is why the <div id="root">
+        above is guaranteed to exist by the time main.jsx runs - even though the
+        script tag is inside <body> rather than after it.
+
+      src="/main.jsx"
+        A browser cannot execute JSX - `<App />` is not valid JavaScript. This works
+        in DEV only because the request for /main.jsx hits the Vite dev server, which
+        transpiles the JSX to plain JS on the fly (via esbuild + @vitejs/plugin-react)
+        and returns valid ES module JavaScript. The leading `/` is root-relative to
+        the Vite project root, which is `frontend/`, so it resolves to frontend/main.jsx.
+
+        At BUILD time (`vite build`) this whole tag is rewritten. Vite crawls from
+        here, bundles + minifies the module graph, and emits something like
+            <script type="module" crossorigin src="/assets/index-a1b2c3d4.js"></script>
+        into dist/index.html. The content hash in the filename is what allows the
+        asset to be cached forever and still bust the cache on the next deploy.
+        No .jsx file is ever shipped to production.
+    -->
     <script type="module" src="/main.jsx"></script>
   </body>
 </html>

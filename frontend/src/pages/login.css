@@ -1,13 +1,132 @@
+/* ==========================================================================
+   login.css - visual styling for the sign-in / register screen
+   ==========================================================================
+
+   WHAT THIS FILE STYLES
+   ---------------------
+   Everything on the login screen rendered by frontend/src/pages/login.jsx:
+   the full-viewport dark backdrop, the white rounded card, the left form
+   column (title, labels, inputs, password eye-toggle, "remember me" row,
+   submit button, "or sign in with" divider, Google button and the
+   register/sign-in switcher) and the right green illustration column that
+   holds the inline SVG.
+
+   HOW IT GETS LOADED
+   ------------------
+   login.jsx does `import './login.css'` on line 2. There is no CSS-in-JS and
+   no CSS Modules here: Vite sees that import, pulls the file into the module
+   graph, and in dev injects it as a plain GLOBAL <style> tag in <head> (in a
+   production build it is extracted into a .css asset and linked). The class
+   names below are therefore the literal class names in the DOM - nothing is
+   hashed or scoped the way a `login.module.css` would be.
+
+   GLOBAL SIDE EFFECTS - READ THIS BEFORE ADDING A SECOND PAGE
+   -----------------------------------------------------------
+   Because the injection is global, these rules apply to the ENTIRE app for as
+   long as the Login module is loaded, not only while the login route is on
+   screen. Two rules leak the hardest:
+     - `*`    sets box-sizing on EVERY element in the document.
+     - `body` sets margin, padding and font-family for the whole page.
+   The generic class names (.input-field, .divider, .submit-btn) share one
+   global namespace too, so a future dashboard.css that also defines
+   .submit-btn will collide with this file. See docs/code/05-styles.md.
+
+   UNITS: rem vs px
+   ----------------
+   Text and spacing are in `rem`. 1rem = the ROOT font size, i.e. whatever the
+   user set in their browser (16px by default, but larger for anyone who
+   raised it for readability). `font-size: 0.875rem` scales with that
+   preference; `font-size: 14px` would silently ignore it. Only genuinely
+   fixed, non-textual values stay in px: border widths, corner radii, the
+   shadow offsets and the 60x40 social button.
+
+   COLOUR SYSTEM
+   -------------
+   #22c55e (Tailwind green-500) is THE brand colour and repeats on: the input
+   focus border, the "Forgot password?" link, the submit button, the checkbox
+   accent, the toggle-mode link and the illustration panel background.
+   #16a34a (green-600) is its single hover shade.
+   The neutrals are the Tailwind grey ramp, darkest to lightest:
+     #111827 (900, heading)  #1f2937 (800, typed input text)
+     #4b5563 (600, body)     #6b7280 (500, labels + divider text)
+     #9ca3af (400, placeholder + toggle icon)
+     #e5e7eb (200, divider hairline)  #f3f4f6 (100, input resting background)
+   NOTE: the greens and greys are hardcoded as literals in 17 separate
+   declarations here (24 colour values in total once #1a1a1c, the two red
+   tints, #ffffff, `white` and the shadow's rgba() are counted). Nothing is
+   named. A custom-property block on :root (`--brand: #22c55e;
+   --brand-hover: #16a34a;` and so on) would turn a rebrand, or a dark-mode
+   theme, into a one-line edit. Flagged here on purpose - NOT refactored.
+   ========================================================================== */
+
+
+/* --------------------------------------------------------------------------
+   1. RESET
+   -------------------------------------------------------------------------- */
+
+/* The universal selector matches every element in the document.
+   CSS defaults to `box-sizing: content-box`, where `width` describes ONLY the
+   content area and padding + border are ADDED on top. So a content-box element
+   with `width: 100%` and `padding: 1rem` ends up 100% + 2rem wide and overflows
+   its parent. `border-box` redefines `width` to mean the whole painted box:
+   content + padding + border.
+   That is exactly what .input-field depends on - it sets `width: 100%` AND
+   `padding: 0.85rem 1rem`, and stays flush with the form column's inner edge
+   instead of spilling past it. No calc(), no magic numbers.
+   Caveat: `*` is global (see the header) and its specificity is 0,0,0, the
+   lowest possible, so any later rule overrides it trivially. */
 * {
   box-sizing: border-box;
 }
 
+/* Every browser's user-agent stylesheet gives <body> a default margin of 8px.
+   Left in place it would show as a dark gutter around .login-container, and the
+   `min-height: 100vh` below would then overrun the viewport by those 16px and
+   produce a permanent scrollbar. Zeroing it is the first line of every reset.
+   `padding: 0` is already the UA default for body; it is stated so the box is
+   unambiguous rather than because it changes anything.
+
+   The SYSTEM FONT STACK asks for a typeface the OS already ships instead of
+   downloading a webfont: text paints on the first frame, there is no
+   flash-of-unstyled-text and no layout shift, and the UI looks native on each
+   platform. First match wins, read left to right:
+     -apple-system       -> San Francisco on macOS/iOS (Safari, Firefox)
+     BlinkMacSystemFont  -> the same San Francisco, Chrome-on-macOS's spelling
+     "Segoe UI"          -> Windows (quoted: the family name contains a space)
+     Roboto              -> Android and Chrome OS
+     Helvetica, Arial    -> older macOS / older Windows fallbacks
+     sans-serif          -> the generic family; last resort, always resolves */
 body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+
+/* --------------------------------------------------------------------------
+   2. LAYOUT CONTAINER - the full-page dark backdrop
+   -------------------------------------------------------------------------- */
+
+/* `display: flex` makes this a flex container with the default
+   `flex-direction: row`, so its MAIN axis is horizontal and its CROSS axis is
+   vertical. That is what the two centring lines lean on:
+     justify-content: center -> centres the card on the MAIN (horizontal) axis
+     align-items: center     -> centres the card on the CROSS (vertical) axis
+   Two declarations replace the old absolute-position + negative-margin and
+   translate(-50%,-50%) hacks for "centre a box in the page".
+
+   `min-height: 100vh` and NOT `height: 100vh`. 100vh is exactly one viewport
+   tall; as a fixed `height` it would CLIP the card on a short window, because
+   the card itself asks for 600px plus this 2rem of padding. `min-height` says
+   "at least a full viewport, but grow past it if the content needs to", so a
+   short viewport scrolls instead of cutting the form off.
+
+   `padding: 2rem` is the breathing room that stops the card touching the screen
+   edge on small viewports - and thanks to the border-box reset above it eats
+   INTO the 100vh rather than being added to it.
+
+   #1a1a1c is a near-black; the only colour in this file outside the green +
+   grey system and the Google red tints. */
 .login-container {
   display: flex;
   min-height: 100vh;
@@ -17,6 +136,33 @@ body {
   padding: 2rem;
 }
 
+
+/* --------------------------------------------------------------------------
+   3. CARD - the white panel holding both columns
+   -------------------------------------------------------------------------- */
+
+/* A nested flex container, again row-direction, so its two children
+   (.login-form-section and .login-illustration-section) sit side by side.
+
+   `width: 100%` + `max-width: 960px` is the standard fluid-up-to-a-cap pattern:
+   below 960px the card shrinks with the viewport, above it the card stops
+   growing so line lengths stay readable on a wide monitor.
+
+   `overflow: hidden` is doing real work here, not tidying. `border-radius`
+   rounds the CARD's corners, but a child painted right up to the edge - the
+   green .login-illustration-section and the SVG inside it - would otherwise
+   paint straight over those rounded corners and square them off. Clipping the
+   descendants to the rounded shape is what keeps the green panel's top-right
+   and bottom-right corners curved. Remove this line and the rounding visibly
+   breaks on the right-hand side only.
+
+   `min-height: 600px` stops the card collapsing to the height of whichever form
+   is showing. login.jsx toggles between sign-in (shorter) and register (an
+   extra Name field, no options row), and without a floor the whole card would
+   jump size every time the user flips modes.
+
+   The shadow - no spread, 10px down, 25px blur, black at 20% alpha - lifts the
+   white card off the near-black backdrop. */
 .login-card {
   display: flex;
   width: 100%;
@@ -28,6 +174,26 @@ body {
   min-height: 600px;
 }
 
+
+/* --------------------------------------------------------------------------
+   4. FORM SECTION - left column
+   -------------------------------------------------------------------------- */
+
+/* `flex: 1` is shorthand for `flex-grow: 1; flex-shrink: 1; flex-basis: 0%`.
+   The basis of 0% is the important half: each panel starts from zero width and
+   ALL the card's width is then shared out in equal 1:1 grow shares, giving a
+   true 50/50 split no matter how much content either column holds. Compare
+   `flex: auto` (basis `auto`), which starts each panel at its natural content
+   width and produces a lopsided split. The illustration section below declares
+   the same `flex: 1`; that pairing is what makes the halves equal.
+
+   This column is ALSO a flex container in its own right, but with
+   `flex-direction: column`, so here the main axis runs vertically. That flips
+   the meaning of the next line: `justify-content: center` now centres the stack
+   of form rows VERTICALLY inside the 600px-tall card. Cross-axis alignment is
+   left at its `stretch` default, so each row still spans the full column width.
+
+   `padding: 4rem 3.5rem` = 64px top/bottom, 56px left/right of whitespace. */
 .login-form-section {
   flex: 1;
   padding: 4rem 3.5rem;
@@ -36,6 +202,42 @@ body {
   justify-content: center;
 }
 
+
+/* --------------------------------------------------------------------------
+   5. ILLUSTRATION SECTION - right column, desktop only
+   -------------------------------------------------------------------------- */
+
+/* Same `flex: 1` as the form column, so the two are equal halves whenever this
+   one is visible.
+
+   MOBILE-FIRST: the base rule here is the PHONE rule. `display: none` removes
+   the illustration from the layout entirely by default, so on a narrow screen
+   the form column is the card's only child and takes the full width. The
+   @media block immediately below is the DESKTOP ENHANCEMENT that switches it
+   back on. Base styles = small screen, media query = larger screen, written
+   with `min-width`: that is what mobile-first means. The opposite (desktop-
+   first) style would set `display: flex` here and use `max-width` queries to
+   take features away as the screen shrinks.
+   The `align-items` and `justify-content` lines below are DEAD declarations.
+   They are obviously inert while `display: none` holds - but they still do
+   nothing after the media query restores `display: flex`, because this panel's
+   only child (the SVG) is `position: absolute` and therefore out of flow, so it
+   is not a flex item and flex alignment never applies to it. Harmless, but do
+   not trust them to centre anything.
+
+   `position: relative` is LOAD-BEARING and COUPLES THIS FILE TO login.jsx.
+   The <Illustration/> component in login.jsx renders its <svg> with an inline
+   style of `{position: 'absolute', top: 0, left: 0}`. An absolutely positioned
+   element is laid out against its nearest POSITIONED ANCESTOR - the closest
+   ancestor whose `position` is anything other than `static`. This rule is that
+   ancestor. Delete `position: relative` here and the SVG escapes all the way
+   out to the initial containing block and lands in the top-left corner of the
+   PAGE, on top of the form. Neither file can be edited safely without knowing
+   about the other.
+
+   `overflow: hidden` clips the artwork. The SVG's paths deliberately run
+   outside the `0 0 400 500` viewBox (e.g. `M -50,300 ...`), and the panel is a
+   different aspect ratio to the viewBox, so without this the bleed would show. */
 .login-illustration-section {
   flex: 1;
   background-color: #22c55e;
@@ -46,12 +248,33 @@ body {
   overflow: hidden;
 }
 
+/* THE DESKTOP ENHANCEMENT. 768px is the conventional tablet-portrait
+   breakpoint. `min-width: 768px` means "apply when the viewport is 768px OR
+   WIDER"; below that the base `display: none` above stands and the card is a
+   single column.
+   A media query contributes NO specificity of its own. Both selectors are
+   plain classes (0,1,0), so this wins purely by coming LATER in the source
+   order - the cascade's final tie-break. Move this block above the rule it
+   overrides and the panel would never appear. */
 @media (min-width: 768px) {
   .login-illustration-section {
     display: flex;
   }
 }
 
+
+/* --------------------------------------------------------------------------
+   6. TYPOGRAPHY - the card heading
+   -------------------------------------------------------------------------- */
+
+/* 1.875rem = 30px at the default root size (the Tailwind "text-3xl" step), kept
+   in rem so it grows with a user who raised their browser font size.
+   700 is bold. #111827 is the darkest grey in the ramp: near-black, but softer
+   than pure #000, which reads harsh against white.
+   Only `margin-bottom` is set, so the <h2>'s user-agent top margin is still in
+   play - it just does not matter here, because the parent column centres its
+   content vertically anyway. 2rem is the gap down to the first field.
+   `text-align: center` centres the heading over the form stack. */
 .login-title {
   font-size: 1.875rem;
   font-weight: 700;
@@ -60,10 +283,26 @@ body {
   text-align: center;
 }
 
+
+/* --------------------------------------------------------------------------
+   7. INPUTS - group, label, wrapper, field, focus state, placeholder
+   -------------------------------------------------------------------------- */
+
+/* One field row (label + wrapper + input). Its only job is the 1.25rem (20px)
+   vertical rhythm between consecutive fields. Margin-BOTTOM rather than
+   margin-top, so the first field sits tight under the heading's own margin and
+   the spacing never doubles up. */
 .input-group {
   margin-bottom: 1.25rem;
 }
 
+/* A <label> is `display: inline` by default, which would drop it onto the same
+   line as whatever follows. `display: block` forces it onto its own line above
+   the field and lets `margin-bottom` apply (vertical margins are ignored on
+   inline boxes).
+   0.85rem at weight 600 makes it a small, semi-bold caption; #6b7280 (grey-500)
+   is deliberately quieter than the value the user types in (#1f2937), so the
+   content outranks the label visually. */
 .input-label {
   display: block;
   font-size: 0.85rem;
@@ -72,10 +311,53 @@ body {
   margin-bottom: 0.4rem;
 }
 
+/* The POSITIONING ANCESTOR for .password-toggle - see section 8.
+   `position: relative` with no top/right/bottom/left offsets moves the element
+   nowhere at all; it purely establishes a reference frame that absolutely
+   positioned descendants resolve against (and creates a new stacking context).
+   It wraps EVERY field, not just the password one, so all three rows stay
+   structurally identical in login.jsx and the CSS does not need a special
+   case. */
 .input-wrapper {
   position: relative;
 }
 
+/* `width: 100%` fills the wrapper; combined with the border-box reset at the
+   top of this file, the 0.85rem/1rem padding is drawn INSIDE that 100%, so the
+   field lines up exactly with the button and the divider below it instead of
+   overflowing the column by 2rem.
+
+   `border: 1px solid transparent` rather than `border: none` is a deliberate
+   layout trick: the 1px border box is reserved up front and is always there,
+   just invisible. The :focus rule below then changes only its COLOUR, so
+   nothing reflows and no element shifts by a pixel when the user tabs in.
+   Declaring `border: none` and adding a border on focus would nudge the whole
+   form every time focus moved.
+
+   ACCESSIBILITY REGRESSION - FLAGGED, INTENTIONALLY NOT FIXED:
+   `outline: none` removes the browser's focus ring. That ring is how keyboard
+   users (Tab), switch-device users and screen-magnifier users know where they
+   are on the page; removing it is a WCAG 2.4.7 "Focus Visible" failure. It is
+   PARTIALLY compensated here - the :focus rule repaints the border green and
+   the background white, which is a real, visible change - but a 1px green hair
+   on a white field is a weak indicator, and #22c55e against #ffffff is around
+   2:1 contrast, under the 3:1 minimum WCAG asks of a non-text focus indicator.
+   The correct fix is to keep a ring on :focus-visible, which fires for keyboard
+   focus but not for mouse clicks, e.g.
+       .input-field:focus-visible { outline: 2px solid #16a34a;
+                                    outline-offset: 2px; }
+   Left exactly as-is on purpose; recorded in docs/code/05-styles.md.
+
+   `transition: border-color 0.2s, background-color 0.2s` animates over 200ms
+   precisely the two properties that :focus changes, so the field eases into its
+   focused look instead of snapping.
+   Why not `transition: all`? Because `all` would animate every animatable
+   property, including ones added to this rule months from now - width, height,
+   padding, font-size - and those trigger layout on every frame, which is
+   expensive. It also destroys readability: with `all` you can no longer tell
+   from the CSS what is supposed to move. Name the properties.
+   There is no `@media (prefers-reduced-motion: reduce)` guard around these
+   transitions; at 200ms the risk is low, but it is a gap - see 05-styles.md. */
 .input-field {
   width: 100%;
   padding: 0.85rem 1rem;
@@ -88,15 +370,64 @@ body {
   transition: border-color 0.2s, background-color 0.2s;
 }
 
+/* `:focus` is a PSEUDO-CLASS (single colon): it matches the same element, but
+   only while it is in a given STATE - here, while it holds focus. It is not a
+   separate element, just a conditional block of declarations.
+   Specificity is 0,2,0 (one class + one pseudo-class) against 0,1,0 for
+   `.input-field`, so it wins while the state is true and falls back cleanly the
+   moment focus leaves - no JavaScript, no class toggling.
+   Green border = the brand colour again; the white background lifts the active
+   field out of the grey resting state so the eye lands on it. */
 .input-field:focus {
   border-color: #22c55e;
   background-color: #ffffff;
 }
 
+/* `::placeholder` is a PSEUDO-ELEMENT (double colon): it styles a fragment the
+   browser generates internally - the greyed hint text - which has no node of
+   its own in the DOM for you to select.
+   #9ca3af (grey-400) is lighter than the typed-value colour #1f2937, so a
+   placeholder is never mistaken for content the user has already entered.
+   Placeholders are hints, never labels - they vanish the instant someone types,
+   which is why login.jsx also renders a real <label> for every field. */
 .input-field::placeholder {
   color: #9ca3af;
 }
 
+
+/* --------------------------------------------------------------------------
+   8. PASSWORD TOGGLE - the eye button sitting inside the password field
+   -------------------------------------------------------------------------- */
+
+/* The "button parked inside an input" pattern. It needs two halves:
+     1. .input-wrapper (section 7) is `position: relative`, making it the
+        positioning ancestor.
+     2. this button is `position: absolute`, which takes it OUT of normal flow -
+        it no longer occupies a slot beside the input, so the input still spans
+        the full width - and positions it against that wrapper's padding box.
+   `right: 1rem` pins it 16px in from the wrapper's right edge, floating over the
+   input's own right padding.
+
+   THE VERTICAL-CENTRING IDIOM - the next two lines only work as a pair:
+     top: 50%                     puts the button's TOP EDGE at the wrapper's
+                                  midpoint. On its own that leaves the icon
+                                  sitting too LOW by half its own height.
+     transform: translateY(-50%)  pulls it back up by 50% of ITS OWN height.
+   The percentage in a transform resolves against the element's own box, which
+   is the whole point: it centres the icon without anyone hardcoding how tall
+   the SVG is. A transform also only moves the painted result, so nothing around
+   it reflows. (`align-items: center` on the wrapper cannot do this job, because
+   an absolutely positioned child is out of flow and is not a flex item.)
+
+   The remaining declarations strip a <button> back to a bare icon:
+     background: none; border: none; padding: 0  remove the UA button chrome
+     cursor: pointer                             a bare button shows the default
+                                                 arrow otherwise
+     display: flex; align-items: center          kills the inline-level descender
+                                                 gap under the 20x20 SVG and
+                                                 centres it inside the button
+   #9ca3af reaches the icon itself through `stroke="currentColor"` on the <svg>
+   in login.jsx - another quiet coupling between the two files. */
 .password-toggle {
   position: absolute;
   right: 1rem;
@@ -111,6 +442,18 @@ body {
   align-items: center;
 }
 
+
+/* --------------------------------------------------------------------------
+   9. FORM OPTIONS - the "Remember me" / "Forgot password?" row
+   -------------------------------------------------------------------------- */
+
+/* The classic two-ends row. `justify-content: space-between` puts the first
+   item flush left, the last flush right, and dumps every pixel of leftover
+   space in the gap between them - no floats, no width arithmetic, and it stays
+   correct when the label text changes length or is translated.
+   `align-items: center` lines the checkbox label and the link up on a shared
+   vertical centre even though they are different heights.
+   This row is conditional in login.jsx: it renders only when isLogin is true. */
 .form-options {
   display: flex;
   justify-content: space-between;
@@ -119,6 +462,12 @@ body {
   font-size: 0.85rem;
 }
 
+/* The whole label is itself a flex row so the native checkbox and its text sit
+   on one centred line (baseline alignment of a replaced form control against
+   text is unreliable; `align-items: center` sidesteps it).
+   `cursor: pointer` advertises that it is clickable - and it genuinely is: the
+   <input> is nested INSIDE the <label> in login.jsx, which is implicit label
+   association, so clicking the words toggles the box with no for/id pair. */
 .checkbox-label {
   display: flex;
   align-items: center;
@@ -127,6 +476,18 @@ body {
   font-weight: 500;
 }
 
+/* `accent-color` is the modern one-line way to theme a NATIVE form control: the
+   browser tints the checkbox's filled state with the brand green and picks a
+   readable tick colour itself. The same property works on radios, ranges and
+   <progress>. Before it existed the only route was to hide the real input and
+   rebuild the box out of a pseudo-element, which quietly threw away keyboard
+   behaviour, the indeterminate state and screen-reader semantics. This is
+   strictly better.
+   1rem x 1rem scales the ~13px default box up to match the text around it.
+   `border-radius: 4px` is a NO-OP in practice: most browsers paint a checkbox
+   as a native widget and ignore border-radius on it entirely. Harmless, but it
+   is not doing what it looks like it is doing - rounding a checkbox requires
+   `appearance: none` and rebuilding the control by hand. */
 .checkbox-input {
   margin-right: 0.5rem;
   accent-color: #22c55e;
@@ -135,16 +496,40 @@ body {
   border-radius: 4px;
 }
 
+/* `text-decoration: none` strips the <a> element's default underline; the brand
+   green plus weight 600 carries the "this is a link" signal instead. Colour
+   alone is not a sufficient affordance, which is why the hover rule below
+   brings the underline back. */
 .forgot-password {
   color: #22c55e;
   text-decoration: none;
   font-weight: 600;
 }
 
+/* Another pseudo-class - `:hover` matches only while a pointer is over the
+   element. Note that hover does not exist on touch devices, so the colour and
+   weight difference above has to stand on its own there. */
 .forgot-password:hover {
   text-decoration: underline;
 }
 
+
+/* --------------------------------------------------------------------------
+   10. SUBMIT BUTTON - the primary action
+   -------------------------------------------------------------------------- */
+
+/* Full-bleed primary action. `width: 100%` spans the form column and, thanks to
+   border-box, the 0.85rem padding stays inside that width so the button's edges
+   line up perfectly with the .input-field boxes above it.
+   `border: none` drops the UA button chrome; `background-color` paints the
+   brand green; white on #22c55e is the highest-emphasis pairing available on
+   this card, which is what a single primary action should look like.
+   The 8px radius is copied from .input-field so the button reads as part of the
+   same vertical stack rather than a foreign widget.
+   1rem/600 keeps the label at body size but heavier than the surrounding text.
+   `cursor: pointer` because a <button> shows the default arrow otherwise.
+   Only `background-color` is transitioned - it is the one property that
+   changes on hover, so naming it is both cheaper and clearer than `all`. */
 .submit-btn {
   width: 100%;
   padding: 0.85rem;
@@ -158,10 +543,29 @@ body {
   transition: background-color 0.2s;
 }
 
+/* #16a34a is green-600, exactly one stop darker than the green-500 resting
+   colour: the conventional "hover = one shade darker" move, eased in over the
+   200ms declared above. Using the ramp's next step rather than an ad-hoc darker
+   green is what keeps the palette coherent. */
 .submit-btn:hover {
   background-color: #16a34a;
 }
 
+
+/* --------------------------------------------------------------------------
+   11. DIVIDER - the "-------- Or sign in with --------" rule
+   -------------------------------------------------------------------------- */
+
+/* In login.jsx this element contains nothing but a text node. The two hairlines
+   either side are generated entirely in CSS, so the markup stays clean.
+   The container is a flex ROW holding three flex items: the ::before line, an
+   anonymous flex item wrapping the text, and the ::after line.
+   `align-items: center` drops the two rules onto the text's vertical midpoint.
+   `margin: 1.5rem 0` spaces the block off the submit button above and the
+   social row below.
+   `text-align: center` is effectively redundant once flexbox is laying the
+   children out - the text item is sized to its content, so there is no spare
+   inline space to align within. Harmless leftover. */
 .divider {
   display: flex;
   align-items: center;
@@ -171,6 +575,21 @@ body {
   font-size: 0.85rem;
 }
 
+/* The two line halves. Three declarations, each essential:
+     content: ''    MANDATORY. A pseudo-element whose `content` property is not
+                    set is simply NOT GENERATED - the box does not exist and
+                    every other declaration in this rule is ignored. The empty
+                    string is what brings an empty box into being.
+     flex: 1        makes each side a flex item that grows into whatever space
+                    the text does not use. Two equal `1` shares means the two
+                    lines are always the same length and the text stays centred
+                    however long it is ("Or sign in with" vs "Or register
+                    with", which login.jsx swaps between).
+     border-bottom  the visible hairline. The generated box has no content and
+                    therefore no height, so its bottom border IS the rule -
+                    1px of #e5e7eb (grey-200).
+   ::before is inserted as the first child of .divider and ::after as the last,
+   which is exactly the order needed to bracket the text. */
 .divider::before,
 .divider::after {
   content: '';
@@ -178,20 +597,53 @@ body {
   border-bottom: 1px solid #e5e7eb;
 }
 
+/* Gap between the left-hand line and the text - applied to that line's INNER
+   (right) edge only, which is why the two sides need separate rules rather than
+   one shared `margin: 0 1rem`. Using a margin here instead of `gap` on .divider
+   keeps the outer edges flush with the card padding. */
 .divider::before {
   margin-right: 1rem;
 }
 
+/* Mirror image: the right-hand line's inner (left) edge. */
 .divider::after {
   margin-left: 1rem;
 }
 
+
+/* --------------------------------------------------------------------------
+   12. SOCIAL LOGIN - the OAuth provider row
+   -------------------------------------------------------------------------- */
+
+/* A centred row of provider buttons. `gap` is flexbox's own spacing property:
+   it inserts 1rem BETWEEN items without adding any outer margin, so when a
+   second or third provider is added later there is no `:last-child` margin
+   clean-up rule to remember. Today login.jsx renders only the Google button, so
+   `justify-content: center` simply centres that one button. */
 .social-login {
   display: flex;
   justify-content: center;
   gap: 1rem;
 }
 
+/* A fixed 60x40 box. It is a row-direction flex container purely so the 18x18
+   Google SVG can be centred on both axes at once - `justify-content: center` on
+   the main (horizontal) axis, `align-items: center` on the cross (vertical) one.
+   With those in place the `padding: 0.5rem 1rem` no longer positions anything;
+   it only guarantees a minimum inner gutter if the fixed width/height are ever
+   dropped.
+
+   `border-radius: 24px` on a box that is only 40px TALL produces a PILL, not a
+   24px rounded rectangle. Any radius at or above half the height (20px here) is
+   clamped by the browser down to exactly half, which turns the short sides into
+   perfect semicircles. Deliberately over-stating the number - 24px, or the
+   common 999px - is the standard shorthand for "fully rounded, whatever the
+   height turns out to be", so the shape survives a change in height.
+
+   #fef2f2 is a red-50 tint chosen to echo the Google mark. It and its hover
+   shade are the only colours in this file outside the green + grey system.
+   `transition: background-color 0.2s` matches the submit button, so every
+   interactive surface on the card settles at the same speed. */
 .social-btn {
   display: flex;
   align-items: center;
@@ -206,10 +658,20 @@ body {
   height: 40px;
 }
 
+/* One step deeper into the red ramp (red-100) on hover, eased by the transition
+   declared above - the same "hover = one shade darker" rule as .submit-btn. */
 .social-btn:hover {
   background-color: #fee2e2;
 }
 
+
+/* --------------------------------------------------------------------------
+   13. TOGGLE MODE - "Don't have an account? Register"
+   -------------------------------------------------------------------------- */
+
+/* The closing line of the card. Centred to match .login-title, one step down in
+   size (0.875rem) and painted #4b5563 (grey-600) so it reads as secondary to
+   the form above it. The 1.5rem top margin separates it from the social row. */
 .toggle-mode {
   margin-top: 1.5rem;
   text-align: center;
@@ -217,6 +679,18 @@ body {
   color: #4b5563;
 }
 
+/* A real <button> styled to look like a link. That is the correct choice, not a
+   cosmetic compromise: this control performs an in-page action (flipping React
+   state to swap the form between sign-in and register) rather than navigating
+   to a URL, so it belongs on <button> for keyboard and screen-reader semantics
+   while LOOKING like the inline link the sentence around it needs.
+   `background: none; border: none; padding: 0` strip the button chrome; the
+   brand green at weight 600 matches .forgot-password so the two read as one
+   family of links; the 0.25rem left margin supplies the word space after
+   "Don't have an account?".
+   Worth noting against section 7: nothing here removes the outline, so this
+   button DOES keep its native focus ring and is both reachable and visible by
+   keyboard. The text inputs are the only controls carrying the regression. */
 .toggle-mode-btn {
   background: none;
   border: none;
@@ -227,6 +701,8 @@ body {
   margin-left: 0.25rem;
 }
 
+/* Underline on hover, mirroring .forgot-password:hover so both link-like
+   controls behave identically. */
 .toggle-mode-btn:hover {
   text-decoration: underline;
 }
