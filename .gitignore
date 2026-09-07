@@ -1,2 +1,30 @@
+# Dependencies — restored by `pnpm install` from pnpm-lock.yaml.
 node_modules
+
+# Environment. `.env` holds real credentials; the `.local` variants are what
+# Vite actually reads at dev time and are per-machine by definition. The bare
+# `.env` rule does NOT cover them, which is why they are listed separately.
 .env
+.env.local
+.env.*.local
+
+# Build output. `vite build` writes frontend/dist/. A committed bundle is worse
+# than noise: every rebuild rewrites hashed filenames, so it produces phantom
+# merge conflicts forever and is one careless `git add .` away from landing.
+dist/
+build/
+
+# Tool caches. tsconfig.app.json already points tsBuildInfoFile inside
+# node_modules, but a stray root-level *.tsbuildinfo is easy to produce by
+# running tsc with different flags.
+.vite/
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# OS and editor noise. `*.stackdump` is a Cygwin/Git-Bash crash artifact — one
+# is already sitting in the sibling 1on1_sb repo, so this machine produces them.
+.DS_Store
+Thumbs.db
+*.stackdump

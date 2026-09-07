@@ -28,8 +28,8 @@ If you have never seen this repo before, read in this order:
 | 01 | [Repo Anatomy](01-repo-anatomy.md) | Full file tree · the three `package.json` roles · the frontend↔backend wiring · the `.env` triangle · the `pnpm dev` startup sequence |
 | 02 | [Root Config](02-root-config.md) | Root `package.json` field by field · the script call-chain · `pnpm-workspace.yaml` · `.npmrc` · `.gitignore` · a `.env.example` and README skeleton |
 | 03 | [Backend](03-backend.md) | `backend/src/server.js` annotated · `backend/package.json` · the `GET /api/health` request lifecycle · what the backend still needs |
-| 04 | [Frontend](04-frontend.md) | The render chain · `login.jsx` in depth · `vite.config.js` · the SVG primer · known frontend issues |
-| 05 | [Styles](05-styles.md) | `login.css` rule by rule · design-token table · layout anatomy · responsive behaviour · CSS concepts primer |
+| 04 | [Frontend](04-frontend.md) | The render chain · the CSS cascade contract · `vite.config.js` · the auth layer (`lib/`) · TypeScript + ESLint config · known frontend issues |
+| 05 | [Styles](05-styles.md) | The token system · the three stylesheets and the namespace convention · techniques (`gap: 1px` hairlines, `color-mix` in oklab, `font-stretch`, the 560px grid transform) · responsive behaviour · CSS concepts primer · what `login.css` did and why it was replaced |
 | 06 | [Dependencies](06-dependencies.md) | Every package: what, why, where used, gotcha · pnpm workspace mechanics · semver primer · declared-but-not-installed table · install cheatsheet |
 | 07 | [CI & Security](07-ci-and-security.md) | `codeql.yml` block by block · the `dependabot.yml` bug and its fix · security posture table · suggested CI additions |
 | 08 | [Gaps & Findings](08-gaps-and-findings.md) | Severity-ranked audit: what is broken, buggy, risky or simply not built yet · accessibility findings · docs-vs-code delta · a suggested fix order |
@@ -74,8 +74,9 @@ pnpm dev:frontend     # just Vite     → http://localhost:3000
 curl http://localhost:5000/api/health   # {"status":"ok", ...}
 ```
 
-> `pnpm lint` **fails today** — ESLint is installed but no config file exists.
-> See [`08-gaps-and-findings.md §1.1`](08-gaps-and-findings.md).
+> `pnpm lint` **works as of 2026-09-06** — `frontend/eslint.config.js` is an
+> ESLint 10 flat config and the run is clean. It used to fail for want of any
+> config at all; see [`08-gaps-and-findings.md §1.1`](08-gaps-and-findings.md).
 
 ### The numbers that matter
 

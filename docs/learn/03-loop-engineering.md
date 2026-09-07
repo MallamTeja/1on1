@@ -277,9 +277,9 @@ nothing. Watching it fail first is how you verify **the gate itself**.
 Applied to this repo's actual next task — wiring `login.jsx` to the backend:
 
 ```js
-// 1. RED — this must fail first, because POST /api/login does not exist yet.
+// 1. RED — this must fail first, because POST /api/auth/login does not exist yet.
 //    Run it. See the failure. That failure is your proof the gate has teeth.
-const res = await fetch('/api/login', {
+const res = await fetch('/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ email: 'a@b.com', password: 'x' }),
@@ -293,7 +293,7 @@ You have no test runner installed yet, and that is fine — `curl` plus an exit 
 legitimate gate. The discipline is what matters, not the framework:
 
 ```bash
-curl -fsS -X POST localhost:5000/api/login \
+curl -fsS -X POST localhost:5000/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"a@b.com","password":"x"}'
 echo "exit=$?"     # nonzero BEFORE you write the route, 0 after. That is red/green.
@@ -326,10 +326,10 @@ GOAL          One sentence. The observable outcome, not the code change.
                     and shows the server's response."
 
 SIGNAL        What tells me it worked? Where does that fact come from?
-              e.g. "HTTP status from POST /api/login + the rendered error text"
+              e.g. "HTTP status from POST /api/auth/login + the rendered error text"
 
 GATE COMMAND  The exact command. Must exit nonzero on failure.
-              e.g. curl -fsS -X POST localhost:5000/api/login -d '...'
+              e.g. curl -fsS -X POST localhost:5000/api/auth/login -d '...'
 
 BASELINE      Is the gate green on untouched code right now?   [ yes / no ]
               If no, fixing the gate IS iteration 1.
@@ -356,7 +356,7 @@ route, `GET /api/health`. Here is that task run as six bounded iterations.
 **Worksheet, filled in:**
 
 - **Goal:** submitting the login form POSTs to the backend and renders the response.
-- **Gate:** `curl -fsS -X POST localhost:5000/api/login ...` then a manual browser check.
+- **Gate:** `curl -fsS -X POST localhost:5000/api/auth/login ...` then a manual browser check.
 - **Max iter:** 6 · **Stop on fail:** same error twice · **Scope:** `login.jsx`, `server.js`
 - **Rollback:** branch `feat/login-wiring`, commit at each green gate.
 
@@ -364,11 +364,11 @@ route, `GET /api/health`. Here is that task run as six bounded iterations.
 |---|---|---|---|---|
 | **0** | **Baseline.** Branch, install deps, confirm the gates work on *untouched* code. | `git switch -c feat/login-wiring && pnpm install && node --check backend/src/server.js` | exit 0 | fix the environment first. Never loop against a red baseline. |
 | **1** | Start the backend. Confirm the existing route answers. | `curl -fsS localhost:5000/api/health` | exit 0, JSON body | not listening → check the port in `server.js` before touching anything |
-| **2** | **RED.** Ask for a route that does not exist yet. | `curl -fsS -X POST localhost:5000/api/login -H 'Content-Type: application/json' -d '{"email":"a@b.com","password":"x"}'` | **nonzero (404)** — this is the point | if it *passes*, your gate is wrong. Fix the gate, not the code. |
-| **3** | Add `POST /api/login` to `server.js`. Hardcode a 200 response — no auth logic yet. Add `express.json()` if the body is undefined. | same command as #2 | exit 0 | body `undefined` → the JSON body parser is missing. One hypothesis, one edit. |
+| **2** | **RED.** Ask for a route that does not exist yet. | `curl -fsS -X POST localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"a@b.com","password":"x"}'` | **nonzero (404)** — this is the point | if it *passes*, your gate is wrong. Fix the gate, not the code. |
+| **3** | Add `POST /api/auth/login` to `server.js`. Hardcode a 200 response — no auth logic yet. Add `express.json()` if the body is undefined. | same command as #2 | exit 0 | body `undefined` → the JSON body parser is missing. One hypothesis, one edit. |
 | **4** | Make the inputs controlled in `login.jsx` (`useState` for email + password). No fetch yet. | `pnpm --filter 1on1-frontend run build`, then type in the browser | build exit 0, typing works | field won't type → you set `value` without `onChange`. Classic. One edit. |
-| **5** | Wire `onSubmit` → `fetch('/api/login')`. Add the Vite dev-server proxy so `/api` reaches the backend port. | submit in the browser; watch the Network tab **and** the backend terminal | request reaches the backend, response renders | 404 at the Vite port → the proxy is the bug, not your fetch |
-| **6** | Error path. Send a bad body; assert the UI shows a message rather than going blank. | `curl -fsS -X POST .../api/login -d '{}'` | **nonzero (400)** — and the browser shows an error | 200 on an empty body → the route validates nothing |
+| **5** | Wire `onSubmit` → `fetch('/api/auth/login')`. Add the Vite dev-server proxy so `/api` reaches the backend port. | submit in the browser; watch the Network tab **and** the backend terminal | request reaches the backend, response renders | 404 at the Vite port → the proxy is the bug, not your fetch |
+| **6** | Error path. Send a bad body; assert the UI shows a message rather than going blank. | `curl -fsS -X POST .../api/auth/login -d '{}'` | **nonzero (400)** — and the browser shows an error | 200 on an empty body → the route validates nothing |
 
 Notice what makes this a loop rather than a to-do list:
 

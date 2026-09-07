@@ -577,7 +577,8 @@ The Gemini model must never receive direct database access.
 
 Correct architecture:
 
-**User → Agent → Gemini → Tool → Express authorization → MongoDB**
+**User → Agent → Gemini → Tool → Express authorization → AWS-hosted cloud
+database**
 
 Every tool must validate:
 
@@ -701,7 +702,7 @@ Notifications should cover:
 
 Realtime notification delivery uses Socket.IO.
 
-Persistent notifications are stored in MongoDB.
+Persistent notifications are stored in RDS PostgreSQL.
 
 ------------------------------------------------------------------------
 

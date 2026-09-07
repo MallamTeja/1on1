@@ -714,6 +714,13 @@ Fifteen direct dependencies across three packages. Locked versions read from
 
   To make them real you would need: `typescript` as a devDependency, a `tsconfig.json`, and
   files renamed `.jsx` → `.tsx` (plus updating the `lint` script's `--ext js,jsx`).
+
+  **Update 2026-09-05 — all three of those landed.** `typescript@^5.9.2` is now a frontend
+  devDependency, `tsconfig.json` / `tsconfig.app.json` / `tsconfig.node.json` exist, the
+  new pages are `.tsx`, and the `lint` script is now `--ext js,jsx,ts,tsx`. The `@types/*`
+  packages are no longer decorative. `build` is `tsc -b && vite build` and there is a
+  separate `typecheck` script. The **backend** was not ported and is still plain ESM
+  JavaScript.
 - **What commonly goes wrong.** (a) The `@types/react` **major must track the `react`
   major** — `@types/react@19` against `react@18` produces a storm of nonsense errors. Here
   both are 18.x. Correct. (b) Because types are a devDependency of one workspace, two
@@ -746,10 +753,11 @@ Fifteen direct dependencies across three packages. Locked versions read from
   across a codebase with more than one author.
 - **Where it is used.** `frontend/package.json`:
   ```json
-  "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
+  "lint": "eslint . --ext js,jsx,ts,tsx --report-unused-disable-directives --max-warnings 0"
   ```
   - `.` — lint the whole `frontend` directory.
-  - `--ext js,jsx` — which extensions to pick up when linting a directory.
+  - `--ext js,jsx,ts,tsx` — which extensions to pick up when linting a directory. `ts,tsx`
+    were added on 2026-09-05 with the TypeScript port; before that it read `--ext js,jsx`.
   - `--report-unused-disable-directives` — flag `// eslint-disable-next-line` comments that
     no longer suppress anything, so stale suppressions get cleaned up.
   - `--max-warnings 0` — **exit non-zero on any warning**, not just errors. Warnings are
@@ -836,7 +844,7 @@ Consequences, stated plainly:
 boundary between the two config systems.
 
 *Option A — `.eslintrc.cjs`, matches the existing `lint` script exactly.* ESLint 8's
-default config system is eslintrc, and the `--ext js,jsx` flag in the current script only
+default config system is eslintrc, and the `--ext` flag in the current script only
 exists in eslintrc mode. This is the lower-friction fix. The `.cjs` extension is required:
 `frontend/package.json` sets `"type": "module"`, so a plain `.js` config using
 `module.exports` would be parsed as ESM and throw.
@@ -1010,9 +1018,9 @@ three manifests.
 
 | Technology | Planned role (source) | Package that would provide it | In a `package.json`? |
 |---|---|---|---|
-| **TypeScript** | §1, §2 — preferred for both frontend and backend | `typescript` (+ `tsconfig.json`, `@types/node`, `tsx` or `ts-node` for the backend) | **No.** Only `@types/*` are installed; no `typescript`, no `tsconfig.json`, all files are `.js`/`.jsx` |
-| **MongoDB Atlas** | §1, §16 — primary database | *(managed service, reached via a driver)* | **No** |
-| **Mongoose** | §1, §16–§19 — ODM, schemas, collections, compound indexes | `mongoose` | **No** |
+| **TypeScript** | §1, §2 — preferred for both frontend and backend | `typescript` (+ `tsconfig.json`, `@types/node`, `tsx` or `ts-node` for the backend) | **Frontend: yes, as of 2026-09-05** — `typescript@^5.9.2`, three `tsconfig*.json` files, `.tsx` pages. **Backend: no** — still plain ESM `.js`, no `typescript`, no `tsconfig.json`. |
+| **AWS-hosted cloud database** | §1, §16 — primary database | *(managed AWS service, reached via a driver — service not yet chosen)* | **No** |
+| **DB client / ODM-ORM** | §1, §16–§19 — schemas, indexes | *(depends on which AWS database service is chosen — see the TODO below)* | **No** |
 | **Socket.IO** | §1, §8–§10 — messaging, presence, notifications, meeting collaboration, WebRTC signaling | `socket.io` (server), `socket.io-client` (browser) | **No** |
 | **WebRTC** | §1, §11–§12 — audio, video, screen sharing | *(browser-native API — no npm package for peer-to-peer; a future SFU would add `mediasoup` / LiveKit / Janus)* | **N/A — native.** No SFU package installed |
 | **Gemini API** | §1, §23–§28 — server-side AI service, agent tools, moderation, meeting notes | `@google/generative-ai` (or the newer `@google/genai`) | **No** |
@@ -1022,14 +1030,19 @@ three manifests.
 | **JWT auth** | §3–§4 — access/refresh tokens, HTTP-only cookies | `jsonwebtoken`, `cookie-parser` | **No** |
 | **bcrypt** | §5 — password hashing; store only the hash | `bcrypt` or `bcryptjs` | **No** |
 | **BullMQ / background jobs** | §31 — reminders, AI processing, email, moderation queues | `bullmq` (requires Redis) | **No** |
-| **RAG / vector search** | §29 — planned for later | *(undecided; MongoDB Atlas Vector Search or a vector DB client)* | **No** |
+| **RAG / vector search** | §29 — planned for later | *(undecided; a dedicated vector DB client, or vector search in the chosen AWS database)* | **No** |
 | **Testing** | §35 — auth, JWT, state transitions, cancellation maths | *(no runner chosen; `vitest` or `node:test`)* | **No.** No `test` script in any `package.json` |
 | **SHA-256 certificate hashing** | §32 — blockchain anchoring | *(Node built-in `node:crypto`)* | **N/A — built-in** |
 | **MediaRecorder** (recording) | §15 — browser-side recording | *(browser-native API)* | **N/A — native** |
 | **Docker** | §34 — **explicitly excluded** from the current plan | *(n/a)* | **No, intentionally** |
 | **GCP hosting / Render** | §33 — deployment target; prototype on Render | *(platform, not a package)* | **N/A** |
 
-**Summary:** of the entire planned stack, only **React, Express and Node** are actually
+> **TODO:** confirm the exact AWS database service (RDS / Aurora / DynamoDB /
+> DocumentDB). Until that is decided the driver package for the database row
+> above cannot be named, and the RAG row cannot be resolved either.
+
+**Summary:** of the entire planned stack, only **React, Express and Node** — plus, since
+2026-09-05, **TypeScript** and **react-router-dom** on the frontend — are actually
 installed. Everything data-related, realtime, AI-related and auth-related is still
 plan-only. That matches `docs/02-technology-stack.md` §37's own engineering rule — *"Do not
 implement infrastructure before the product needs it"* — so it is a deliberate state, not
@@ -1074,7 +1087,7 @@ packages in one pass and writes one lockfile.
 
 ```bash
 # a RUNTIME dependency to the backend only
-pnpm --filter 1on1-backend add mongoose
+pnpm --filter 1on1-backend add jsonwebtoken
 
 # a DEV dependency to the frontend only  (-D)
 pnpm --filter 1on1-frontend add -D vitest
@@ -1092,7 +1105,7 @@ pnpm --filter 1on1-backend add -E express@4.22.2
 `-w` is required for root installs — without it pnpm refuses, on the assumption that
 installing into the workspace root is usually a mistake.
 
-You can also `cd backend && pnpm add mongoose`; pnpm infers the workspace from the
+You can also `cd backend && pnpm add jsonwebtoken`; pnpm infers the workspace from the
 directory. `--filter` from the root is preferred because it is copy-pasteable and
 scriptable.
 

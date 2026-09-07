@@ -9,13 +9,17 @@
     "dev:frontend": "pnpm --filter 1on1-frontend run dev",
     "dev": "concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\""
   },
-  "keywords": ["1on1","Teja Mallam"],
+  "keywords": [
+    "1on1",
+    "Teja Mallam"
+  ],
   "author": "Teja Mallam",
   "license": "ISC",
+  "packageManager": "pnpm@11.25.0",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "^11.5.2",
+      "version": "11.25.0",
       "onFail": "download"
     }
   },

@@ -1,0 +1,10 @@
+{
+  // Solution-style config: holds no files itself, just points at the two real
+  // projects. Keeps app code (DOM, browser) and build tooling (node) from
+  // sharing a lib/types surface they have no business sharing.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

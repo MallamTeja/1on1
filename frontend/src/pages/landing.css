@@ -1,0 +1,1054 @@
+/* ==========================================================================
+   Landing. Every rule is namespaced .ld- so it can never collide with the
+   shared ui- primitives or the other pages.
+   ========================================================================== */
+
+.ld {
+  background: var(--ground);
+}
+
+/* ---- Nav ---------------------------------------------------------------- */
+
+.ld-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in oklab, var(--ground) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.ld-nav__inner {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  min-height: 70px;
+}
+
+.ld-nav__links {
+  display: flex;
+  gap: 26px;
+  margin-right: auto;
+  font-size: var(--step-small);
+  font-weight: 500;
+}
+
+.ld-nav__links a {
+  color: var(--ink-2);
+}
+
+.ld-nav__links a:hover {
+  color: var(--ink);
+}
+
+.ld-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.ld-nav__login {
+  font-size: var(--step-small);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ld-nav__login:hover {
+  color: var(--spruce);
+}
+
+/* ---- Hero --------------------------------------------------------------- */
+
+.ld-hero {
+  padding: 84px 0 44px;
+}
+
+.ld-hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
+  gap: 64px;
+  align-items: center;
+}
+
+.ld-hero__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-top: 8px;
+}
+
+.ld-hero__title {
+  max-width: 19ch;
+  font-size: clamp(2.4rem, 3.5vw, 3.4rem);
+  font-weight: 800;
+  font-stretch: 118%;
+}
+
+.ld-hero__sub {
+  max-width: 46ch;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.ld-hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.ld-hero__second {
+  font-size: var(--step-body);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.ld-hero__second:hover {
+  color: var(--spruce);
+}
+
+.ld-hero__fine {
+  color: var(--ink-3);
+}
+
+.ld-hero__art {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The state track under the week card: what the request turns into. */
+.ld-track {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 15px 18px 17px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.ld-track__states {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+
+.ld-track__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+  font-size: var(--step-label);
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ld-track__state + .ld-track__state::before {
+  content: "→";
+  color: var(--line);
+  letter-spacing: 0;
+}
+
+.ld-track__state--now {
+  color: var(--spruce);
+  font-weight: 600;
+}
+
+.ld-track__note {
+  font-size: var(--step-small);
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.ld-week {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: 0 18px 44px -28px rgba(18, 23, 22, 0.34);
+  overflow: hidden;
+}
+
+.ld-week__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.ld-week__who {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.ld-week__avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-md);
+  background: var(--spruce);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: var(--step-small);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ld-week__name {
+  display: block;
+  font-size: var(--step-title);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+.ld-week__role {
+  display: block;
+  font-size: var(--step-small);
+  color: var(--ink-3);
+}
+
+.ld-week__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line-soft);
+}
+
+.ld-day {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 168px;
+  padding: 11px 7px 13px;
+  background: var(--surface);
+}
+
+.ld-day__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding-bottom: 5px;
+}
+
+.ld-day__name {
+  font-family: var(--mono);
+  font-size: var(--step-label);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ld-day__date {
+  font-size: var(--step-small);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ld-day__empty {
+  margin-top: 6px;
+  text-align: center;
+  font-family: var(--mono);
+  color: var(--line);
+}
+
+.ld-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 130ms ease, background 130ms ease,
+    transform 130ms ease;
+}
+
+.ld-chip:hover:not(:disabled) {
+  border-color: var(--spruce);
+  background: var(--spruce-tint);
+  transform: translateY(-1px);
+}
+
+.ld-chip__time {
+  font-family: var(--mono);
+  font-size: var(--step-label);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.ld-chip__tag {
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+.ld-chip--free {
+  border-color: color-mix(in oklab, var(--spruce) 34%, var(--line));
+}
+
+.ld-chip--free .ld-chip__tag {
+  color: var(--spruce);
+  font-weight: 500;
+}
+
+.ld-chip--paid .ld-chip__tag,
+.ld-chip--group .ld-chip__tag {
+  color: var(--clay);
+  font-weight: 500;
+}
+
+.ld-chip--group {
+  border-color: color-mix(in oklab, var(--clay) 30%, var(--line));
+  border-style: dashed;
+}
+
+.ld-chip--full {
+  background: var(--ground-sunk);
+  border-color: var(--line-soft);
+  cursor: not-allowed;
+}
+
+.ld-chip--full .ld-chip__time,
+.ld-chip--full .ld-chip__tag {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--line);
+}
+
+.ld-week__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--surface-2);
+}
+
+/* ---- Section furniture -------------------------------------------------- */
+
+.ld-sec__head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 62ch;
+}
+
+.ld-sec__title {
+  font-size: var(--step-h2);
+  max-width: 24ch;
+}
+
+.ld-sec__lede {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 54ch;
+}
+
+/* ---- The loop ----------------------------------------------------------- */
+
+.ld-loop {
+  padding: 96px 0;
+}
+
+.ld-loop__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 56px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.ld-step {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 26px 26px 30px;
+  background: var(--surface);
+}
+
+.ld-step__n {
+  font-size: var(--step-small);
+  font-weight: 600;
+  color: var(--spruce);
+}
+
+.ld-step__verb {
+  font-size: var(--step-h3);
+  font-weight: 700;
+  font-stretch: 112%;
+}
+
+.ld-step__body {
+  font-size: var(--step-body);
+  color: var(--ink-2);
+}
+
+.ld-loop__return {
+  margin-top: 26px;
+  font-size: var(--step-body);
+  color: var(--ink-2);
+}
+
+.ld-loop__return .ui-label {
+  display: inline;
+  margin-right: 8px;
+  color: var(--spruce);
+}
+
+/* ---- Sessions ----------------------------------------------------------- */
+
+.ld-sessions {
+  padding: 96px 0;
+}
+
+.ld-offers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 52px;
+}
+
+.ld-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px 24px 28px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--spruce);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.ld-offer--paid {
+  border-top-color: var(--clay);
+}
+
+.ld-offer__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.ld-offer__price {
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.ld-offer--free .ld-offer__price {
+  color: var(--spruce);
+}
+
+.ld-offer--paid .ld-offer__price {
+  color: var(--clay);
+}
+
+.ld-offer__title {
+  font-size: var(--step-h3);
+}
+
+.ld-offer__shape {
+  color: var(--ink-3);
+}
+
+.ld-offer__note {
+  margin-top: 6px;
+  font-size: var(--step-small);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.ld-policy {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
+  margin-top: 64px;
+  padding: 34px 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.ld-policy__title {
+  font-size: 1.5rem;
+  max-width: 22ch;
+}
+
+.ld-policy__body {
+  margin-top: 12px;
+  font-size: var(--step-body);
+  color: var(--ink-2);
+}
+
+.ld-policy__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--step-small);
+}
+
+.ld-policy__table tr {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.ld-policy__table tr:last-child {
+  border-bottom: 0;
+}
+
+.ld-policy__table th {
+  padding: 11px 0;
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.ld-policy__table td {
+  padding: 11px 0 11px 20px;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--ink-3);
+}
+
+.ld-policy__refund {
+  color: var(--spruce);
+  font-weight: 500;
+}
+
+/* ---- The room ----------------------------------------------------------- */
+
+.ld-room {
+  padding: 96px 0;
+}
+
+.ld-room__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: 64px;
+  align-items: center;
+}
+
+.ld-room__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.ld-room__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px;
+  background: var(--surface);
+  font-size: var(--step-small);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.ld-room__item svg {
+  flex: 0 0 auto;
+  color: var(--spruce);
+}
+
+/* ---- AI ----------------------------------------------------------------- */
+
+.ld-ai {
+  padding: 96px 0;
+}
+
+.ld-ai__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 52px;
+}
+
+.ld-recap {
+  padding: 24px 26px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.ld-recap__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.ld-recap__title {
+  margin: 18px 0 20px;
+  font-size: 1.35rem;
+}
+
+.ld-recap__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.ld-recap__body dd {
+  margin: 0 0 18px;
+  font-size: var(--step-body);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.ld-recap__body dd:last-child {
+  margin-bottom: 0;
+}
+
+.ld-recap__items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ld-recap__items li {
+  padding-left: 15px;
+  border-left: 2px solid var(--spruce-tint);
+}
+
+.ld-recap__owner {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ld-assist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 26px 26px;
+  border: 1px solid var(--spruce-deep);
+  border-radius: var(--r-lg);
+  background: var(--spruce-deep);
+  color: var(--on-dark);
+}
+
+.ld-assist__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(143, 211, 193, 0.22);
+  color: var(--spruce-glow);
+}
+
+.ld-assist__head .ui-label {
+  color: var(--spruce-glow);
+}
+
+.ld-assist__ask {
+  padding: 9px 13px;
+  border: 1px dashed rgba(143, 211, 193, 0.3);
+  border-radius: var(--r-sm);
+  font-size: var(--step-small);
+  color: var(--on-dark-2);
+}
+
+.ld-assist__turn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.ld-assist__you {
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 9px 13px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: var(--step-body);
+  color: var(--on-dark);
+}
+
+.ld-assist__reply {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: var(--step-body);
+  line-height: 1.6;
+}
+
+.ld-assist__reply strong {
+  color: #fff;
+}
+
+.ld-assist__gate {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ld-assist__gate .ui-btn {
+  background: var(--spruce-glow);
+  color: var(--spruce-deep);
+}
+
+.ld-assist__gate .ui-btn:hover {
+  background: #fff;
+  color: var(--spruce-deep);
+}
+
+.ld-assist__gate .ui-btn--ghost {
+  background: transparent;
+  border-color: rgba(143, 211, 193, 0.42);
+  color: var(--on-dark);
+}
+
+.ld-assist__gate .ui-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--spruce-glow);
+  color: #fff;
+}
+
+.ld-assist__fine {
+  margin-top: auto;
+  padding-top: 12px;
+  color: var(--on-dark-2);
+  letter-spacing: 0.08em;
+  line-height: 1.6;
+}
+
+/* ---- Proof -------------------------------------------------------------- */
+
+.ld-proof {
+  padding: 80px 0;
+}
+
+.ld-proof__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.ld-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 28px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.ld-quote__ph {
+  font-family: var(--mono);
+  font-size: var(--step-small);
+  line-height: 1.7;
+  color: var(--ink-3);
+}
+
+.ld-quote__by {
+  color: var(--ink-3);
+}
+
+/* ---- Close -------------------------------------------------------------- */
+
+.ld-close {
+  padding: 104px 0 112px;
+}
+
+.ld-close__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.ld-close__title {
+  font-size: var(--step-h2);
+  max-width: 26ch;
+}
+
+.ld-close__body {
+  max-width: 50ch;
+  font-size: 1.0625rem;
+  color: var(--ink-2);
+}
+
+/* ---- Footer ------------------------------------------------------------- */
+
+.ld-foot__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+  padding-top: 26px;
+  padding-bottom: 34px;
+}
+
+.ld-foot__note {
+  color: var(--ink-3);
+}
+
+.ld-foot__links {
+  display: flex;
+  gap: 22px;
+  font-size: var(--step-small);
+  font-weight: 500;
+}
+
+.ld-foot__links a {
+  color: var(--ink-2);
+}
+
+.ld-foot__links a:hover {
+  color: var(--spruce);
+}
+
+/* ---- Responsive ---------------------------------------------------------
+   The ladder: 3-up -> 2-up -> 1-up for content grids, and the availability
+   week goes 7 columns -> a day-per-row list rather than shrinking to
+   unreadable columns.
+   ------------------------------------------------------------------------- */
+
+/* Small laptop and large tablet: the hero stacks, so the week card no longer
+   competes with the headline for width. */
+@media (max-width: 1040px) {
+  .ld-hero__grid,
+  .ld-room__grid,
+  .ld-policy {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+
+  .ld-hero {
+    padding: 64px 0 80px;
+  }
+
+  .ld-hero__title {
+    max-width: 24ch;
+  }
+
+  /* Full-bleed would sprawl once it is the only thing in the row. */
+  .ld-week,
+  .ld-track {
+    max-width: 760px;
+  }
+
+  .ld-loop__list,
+  .ld-offers,
+  .ld-ai__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Tablet: the section anchors go, the two actions stay. */
+@media (max-width: 900px) {
+  .ld-nav__inner {
+    gap: 20px;
+  }
+
+  .ld-nav__links {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .ld-hero {
+    padding: 44px 0 64px;
+  }
+
+  .ld-hero__title {
+    max-width: 22ch;
+    font-size: clamp(1.85rem, 7vw, 2.5rem);
+  }
+
+  .ld-hero__sub {
+    font-size: 1rem;
+  }
+
+  .ld-nav__login {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .ld-offers,
+  .ld-ai__grid,
+  .ld-proof__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ld-loop,
+  .ld-sessions,
+  .ld-room,
+  .ld-ai {
+    padding: 64px 0;
+  }
+
+  .ld-proof {
+    padding: 56px 0;
+  }
+
+  .ld-close {
+    padding: 64px 0 72px;
+  }
+
+  .ld-policy {
+    padding: 24px 20px;
+  }
+
+  .ld-recap,
+  .ld-assist {
+    padding: 20px 20px 22px;
+  }
+
+  .ld-foot__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+  }
+}
+
+/* Phone. Everything is one column and the week becomes a list of days. */
+@media (max-width: 560px) {
+  .ld-nav__inner {
+    gap: 12px;
+  }
+
+  .ld-nav__actions {
+    gap: 12px;
+  }
+
+  .ld-nav__actions .ui-btn {
+    padding: 0 14px;
+  }
+
+  .ld-loop__list,
+  .ld-room__list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ld-step {
+    padding: 22px 20px 24px;
+  }
+
+  /* One row per day: label on the left, that day's slots flowing beside it. */
+  .ld-week__grid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* The day label is taken out of flow and the row is padded past it, so a
+     third slot wraps into line with the first two instead of sliding back
+     under the label. */
+  .ld-day {
+    position: relative;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 56px;
+    padding: 8px 14px 8px 92px;
+  }
+
+  .ld-day__head {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 7px;
+    padding-bottom: 0;
+  }
+
+  .ld-chip {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 13px;
+  }
+
+  .ld-day__empty {
+    margin-top: 0;
+    text-align: left;
+  }
+
+  .ld-week__head,
+  .ld-week__foot {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Three columns of nowrapped money will not fit — stack each rule. */
+  .ld-policy__table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 14px;
+    padding: 12px 0;
+  }
+
+  .ld-policy__table th {
+    grid-column: 1 / -1;
+    padding: 0 0 2px;
+  }
+
+  .ld-policy__table td {
+    padding: 0;
+    text-align: left;
+    font-size: var(--step-small);
+  }
+
+  .ld-policy__refund {
+    text-align: right;
+  }
+
+  .ld-quote {
+    padding: 22px 20px;
+  }
+}
+
+/* Very narrow: the mark carries the brand so the nav actions keep their room. */
+@media (max-width: 380px) {
+  .ld-nav .brand__word {
+    display: none;
+  }
+}

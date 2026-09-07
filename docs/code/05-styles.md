@@ -1,1038 +1,548 @@
-# 05 — Styles: how `login.css` works, rule by rule
+# 05 — Styles: the token system, the three stylesheets, and the techniques in them
 
-> Scope: [`frontend/src/pages/login.css`](../../frontend/src/pages/login.css) — the
-> only stylesheet that exists in this repo — plus the colours that live inline in
-> [`frontend/src/pages/login.jsx`](../../frontend/src/pages/login.jsx).
-> Every claim below was checked against the working tree.
+Code-level documentation for the CSS. Every claim was verified against the working
+tree.
+
+> **RE-DERIVED 2026-09-06.** This file previously walked `frontend/src/pages/login.css`
+> rule by rule. **That file was deleted** when the TypeScript port was mounted, along
+> with the `login.jsx` it styled. The design system that replaced it is a different
+> thing entirely — tokenised, namespaced, and split across three files.
+>
+> The old approach is **not** erased: §9 keeps it as history, because "why we moved to
+> tokens" only makes sense if you can still see what we moved *from*. If you are
+> looking for `.login-card`, `.input-field`, `.password-toggle` or the `#22c55e`
+> brand green, that is where they went.
 
 ---
 
 ## 1. How styling works in this project today
 
-**One plain global CSS file, imported from a component, injected by the bundler.**
-That is the whole system. There is no Tailwind, no CSS Modules, no
-styled-components, no Sass, no PostCSS config, no design-token package.
+Three plain, global CSS files. **No CSS Modules, no Tailwind, no CSS-in-JS.** The
+scoping strategy is a naming convention, enforced by review rather than by tooling.
 
-Two independent sources confirm it:
-
-| Source | What it says |
-| --- | --- |
-| [`docs/02-technology-stack.md`](../02-technology-stack.md) | Under **Frontend** it lists `React, TypeScript, HTML, CSS, anime.js, D3.js`, and under **Programming Languages** it lists `HTML` and `CSS` again. The words *Tailwind*, *CSS Modules*, *styled-components* and *Sass* do not appear anywhere in that document. Plain CSS is the documented intent. |
-| `frontend/package.json` | Dependencies are `react` and `react-dom`. Dev dependencies are Vite, the React plugin, and ESLint. **Zero styling packages.** Plain CSS is also the actual state. |
-
-> Two smaller mismatches worth knowing while you are here: the stack doc lists
-> TypeScript, but the frontend is `.jsx` with no TypeScript configured, and it lists
-> `anime.js` and `D3.js`, neither of which is installed. Those belong to
-> [`08-gaps-and-findings.md`](08-gaps-and-findings.md), not to this document.
+| File | Lines | Namespace | Owns |
+| --- | --- | --- | --- |
+| `src/index.css` | 565 | `ui-` (+ `brand*`) | The design tokens, the reset, and every shared primitive |
+| `src/pages/landing.css` | 1054 | `.ld-` | The landing page, and nothing else |
+| `src/components/authShell.css` | 310 | `.au-` | The login/register shell, and nothing else |
 
 ### The load path
 
 ```
-frontend/index.html
-  └─ <script type="module" src="/main.jsx">
-       └─ main.jsx  ──imports──▶  app.jsx  ──imports──▶  src/pages/login.jsx
-                                                            │
-                                                            └─ import './login.css'
+src/main.tsx
+  └─ import "./index.css"          ← tokens + reset + primitives, FIRST
+  └─ import App from "./App"
+       └─ pages/Landing.tsx
+            └─ import "./landing.css"           ← .ld-
+       └─ pages/Login.tsx  →  components/AuthShell.tsx
+            └─ import "./authShell.css"         ← .au-
 ```
 
-Note what is **not** in that chain: `index.html` never contains a
-`<link rel="stylesheet">`. The CSS is discovered only because a JavaScript module
-imports it.
+CSS reaches the browser through the **JavaScript module graph**, not through `<link>`
+tags. Vite sees `import "./index.css"`, injects it as a `<style>` in dev, and extracts
+it into one hashed `.css` file at build time. That is why `index.html` `<link>`s no
+stylesheet of its own — only the Google Fonts sheet, which is genuinely external.
 
-| Mode | What Vite does with `import './login.css'` |
-| --- | --- |
-| `pnpm dev` | Rewrites the import into a tiny JS module that creates a `<style>` element, fills it with the file's text, and appends it to `<head>`. Editing the file hot-swaps that one `<style>` tag with no page reload. |
-| `pnpm build` | Extracts the CSS out of the JS graph entirely and emits `dist/assets/index-<hash>.css`, linked from the built `dist/index.html`. |
-
-Either way the result is the same for authoring purposes: **a global stylesheet**.
-The class names in the file are the literal class names in the DOM. Nothing is
-hashed, prefixed or scoped.
+> **The import order in `main.tsx` is load-bearing.** `index.css` must come before
+> `./App`, because the shared primitives and the page rules have identical
+> specificity and the cascade therefore resolves them by source order. This is
+> documented once, in **[`04-frontend.md` §4.2](04-frontend.md)** — go there for the
+> full reasoning rather than trusting a summary.
 
 ---
 
-## 2. What "global" actually costs you
+## 2. What "global" costs, and how the convention pays it back
 
-The stylesheet is evaluated as soon as the `Login` module is evaluated — which is at
-app startup, because `app.jsx` imports it statically — and it is never unloaded.
-So these rules are live on **every** screen the app will ever have, not just while
-the login route is on screen.
+Every rule in all three files lands in one flat global namespace. Nothing is scoped
+by tooling; `.ld-nav` is as reachable from the auth shell as from the landing page.
 
-**The two rules that leak hardest:**
+That is a real cost, and the previous stylesheet paid it in full: `login.css` declared
+bare `*` and `body` rules plus generic class names like `.input-field`, `.divider` and
+`.submit-btn`. Any second screen importing its own CSS would have collided on sight.
 
-```css
-* { box-sizing: border-box; }
+The current system pays it back with **one rule, applied without exception**:
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-```
+> **Every class is prefixed by the file that owns it.** `ui-` for anything shared,
+> `.ld-` for landing, `.au-` for the auth shell.
 
-`*` rewrites the box model for every element in the document. `body` sets the page's
-margin and typeface. Both are *good* defaults — most projects want exactly this —
-but they are being set by a page component, which means:
+Two consequences worth internalising:
 
-- deleting the login page, or lazy-loading it behind a route, silently removes the
-  app-wide reset and the font;
-- a reader looking for "where is the global reset?" has no reason to look in
-  `pages/login.css`;
-- these are decisions about the whole application being made in a leaf file.
+1. **Collisions become impossible by construction**, not by luck. `.au-panel` and
+   `.ld-panel` are different classes. No tooling is required to guarantee it, which is
+   why the convention has to be honoured on every new file — it is the entire
+   mechanism.
+2. **The prefix tells you which file to open.** Seeing `.ld-week__grid` in devtools
+   tells you the rule is in `landing.css`, before you search anything.
 
-**The collision that is coming.** The class names here are generic. The moment a
-second page ships its own stylesheet, both are in the same global namespace and the
-later import wins on equal specificity:
+The naming inside a namespace is loosely BEM: `.ui-slot` is the block,
+`.ui-slot__time` an element, `.ui-slot--dark` a modifier.
 
-| Class in `login.css` | A second page will plausibly want it too |
-| --- | --- |
-| `.input-field`, `.input-label`, `.input-group`, `.input-wrapper` | any form |
-| `.submit-btn` | any form |
-| `.divider` | any "or" separator |
-| `.social-btn`, `.social-login` | `register.jsx` — which is an empty file today |
-| `.toggle-mode`, `.form-options` | the register flow |
-
-Note that `register.jsx` and `landingpage.jsx` exist as 0-byte files. Whoever fills
-them in hits this on day one. Section 9 lists the two standard ways out.
+**This is a deliberate trade, not an oversight.** CSS Modules would make collisions
+structurally impossible, at the cost of generated class names that are unreadable in
+devtools and a build step between you and your styles. At three stylesheets the
+convention is cheaper. At thirty it will not be — see §10.
 
 ---
 
 ## 3. Design tokens
 
-There is no token layer — every value below is a literal typed directly into a
-declaration. This table *is* the token system, reverse-engineered.
+**All ~34 tokens live in one `:root` block at the top of `index.css`. The two page
+stylesheets define exactly zero** — verified. There is therefore precisely one place
+in the project where a colour, a type step or a radius is defined.
 
-### 3.1 Colours in `login.css`
+> **Never inline a colour.** If the token you need does not exist, add it to `:root`.
+> A hex literal in a page stylesheet is invisible to every other screen, invisible to
+> any future dark mode, and impossible to grep for meaningfully.
 
-| Hex | Name (Tailwind ramp) | Role | Uses | Where |
-| --- | --- | --- | ---: | --- |
-| `#22c55e` | green-500 | **Brand.** The single most repeated colour in the file. | **6** | `.login-illustration-section` bg, `.input-field:focus` border, `.checkbox-input` accent, `.forgot-password` text, `.submit-btn` bg, `.toggle-mode-btn` text |
-| `#16a34a` | green-600 | Brand hover — one stop darker | 1 | `.submit-btn:hover` bg |
-| `#111827` | grey-900 | Heading text | 1 | `.login-title` |
-| `#1f2937` | grey-800 | Typed input value | 1 | `.input-field` |
-| `#4b5563` | grey-600 | Secondary body text | 2 | `.checkbox-label`, `.toggle-mode` |
-| `#6b7280` | grey-500 | Field labels, divider text | 2 | `.input-label`, `.divider` |
-| `#9ca3af` | grey-400 | Placeholder + icon | 2 | `.input-field::placeholder`, `.password-toggle` |
-| `#e5e7eb` | grey-200 | Hairline rule | 1 | `.divider::before` / `::after` border |
-| `#f3f4f6` | grey-100 | Input resting background | 1 | `.input-field` |
-| `#ffffff` | white | Card surface, focused field | 2 | `.login-card` bg, `.input-field:focus` bg |
-| `white` | *keyword* | Submit button label | 1 | `.submit-btn` — the same colour written a second way |
-| `#1a1a1c` | — (custom near-black) | Page backdrop | 1 | `.login-container` |
-| `#fef2f2` | red-50 | Google button resting bg | 1 | `.social-btn` |
-| `#fee2e2` | red-100 | Google button hover bg | 1 | `.social-btn:hover` |
-| `rgba(0,0,0,0.2)` | — | Card drop shadow | 1 | `.login-card` |
+### 3.1 Ground and ink — the neutrals
 
-**Total: 24 colour literals across 33 rules.** The green + grey system alone accounts
-for 17 of them. None is named; a rebrand means 17 find-and-replaces, and a dark theme
-is not expressible at all.
+Biased slightly green-cool. Never pure grey, which is what stops the UI reading as a
+default bootstrap page.
 
-Note `#ffffff` and `white` are the same colour written two ways — a small symptom of
-having no token layer to normalise against.
+| Token | Value | Used for |
+| --- | --- | --- |
+| `--ground` | `#f1f4f2` | The page background |
+| `--ground-sunk` | `#e7ebe9` | Recessed areas |
+| `--surface` | `#ffffff` | Cards, inputs, anything raised |
+| `--surface-2` | `#f7f9f8` | Hover state for surfaces |
+| `--line` | `#d2dad7` | Ordinary borders |
+| `--line-soft` | `#e3e9e6` | Hairlines — see the `gap: 1px` trick in §5.1 |
+| `--ink` | `#121716` | Body text |
+| `--ink-2` | `#4d5a57` | Secondary text |
+| `--ink-3` | `#7d8985` | Tertiary text, placeholders |
 
-### 3.2 Colours that exist only in `login.jsx`
+### 3.2 Accents
 
-The illustration and the Google mark are inline SVG, so their colours never reach the
-stylesheet. They cannot be themed, overridden or dark-moded from CSS.
+Spruce is the brand **and** the confirmed state — the good state is the brand colour,
+which is why nothing else may claim it.
 
-| Hex | Name | Role | Uses |
-| --- | --- | --- | ---: |
-| `#FFFFFF` | white | Every line, circle and stroke in the illustration | 23 |
-| `#FBBF24` | amber-400 | Character 1's body, feet and the two small triangles | 5 |
-| `#EA4335` | Google red | All four paths of the Google logo | 4 |
-| `#EF4444` | red-500 | Character 2's body and feet | 3 |
-| `#3B82F6` | blue-500 | Character 2's legs | 2 |
+| Token | Value | Meaning |
+| --- | --- | --- |
+| `--spruce` | `#14564a` | Brand, primary action, confirmed |
+| `--spruce-deep` | `#0d3f36` | The dark marketing panel |
+| `--spruce-lift` | `#1c6f5f` | Hover on spruce |
+| `--spruce-tint` | `#dfeae6` | Focus rings, tinted backgrounds |
+| `--spruce-glow` | `#8fd3c1` | Accents *on* dark spruce |
+| `--clay` / `--clay-tint` | `#97591f` / `#f3e7d8` | Pending, awaiting-response |
+| `--brick` / `--brick-tint` | `#8c3a2e` / `#f5e2de` | Errors, destructive |
+| `--on-dark` / `--on-dark-2` | `#eaf1ee` / `#9db8b0` | Text on spruce panels |
 
-Two things to flag:
+The three-state colour language — **spruce = confirmed, clay = pending, brick = wrong**
+— is applied consistently across `.ui-pill`, `.ui-slot` and the form error states.
+Learn it once and every status in the UI is readable without a legend.
 
-1. **The Google mark is wrong.** All four of its paths are `fill="#EA4335"`. The real
-   logo is red / green / yellow / blue (`#EA4335`, `#34A853`, `#FBBC05`, `#4285F4`).
-   Today it renders as a solid red blob.
-2. The illustration's `#FFFFFF` strokes are chosen to sit on `#22c55e`. Change the
-   brand green in the CSS and the SVG contrast changes with it, in the other file.
+### 3.3 Type
 
-### 3.3 The rest of the scale
-
-| Kind | Values in use |
+| Token | Value |
 | --- | --- |
-| Radii | `4px` (checkbox — see §8), `8px` (input, submit), `12px` (card), `24px` (social pill) |
-| Font sizes | `0.85rem`, `0.875rem`, `1rem`, `1.875rem` |
-| Font weights | `500`, `600`, `700` |
-| Spacing | `0.25 / 0.4 / 0.5 / 1 / 1.25 / 1.5 / 2 / 3.5 / 4` rem |
-| Transition | `0.2s`, three times, always on named properties |
-| Breakpoint | `768px`, once |
+| `--display` | `"Archivo", "Helvetica Neue", Arial, sans-serif` |
+| `--body` | `"Instrument Sans", "Helvetica Neue", Arial, sans-serif` |
+| `--mono` | `"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace` |
 
-**Why `rem` and not `px`.** `1rem` equals the **root** font size — whatever the user
-set in their browser, 16px by default but larger for anyone who raised it for
-readability. `font-size: 0.875rem` honours that preference; `font-size: 14px` would
-silently override it and cap the text at 14px no matter what the user asked for.
-Only genuinely fixed, non-textual values are left in `px` here: border widths, corner
-radii, shadow offsets and the fixed 60×40 social button.
+The scale is **fluid at the top, fixed at the bottom**:
+
+| Token | Value | Note |
+| --- | --- | --- |
+| `--step-display` | `clamp(2.6rem, 4.4vw, 4rem)` | Hero |
+| `--step-h2` | `clamp(1.9rem, 2.6vw, 2.5rem)` | Section heads |
+| `--step-h3` | `1.4rem` | |
+| `--step-title` | `1.0625rem` | |
+| `--step-body` | `0.9375rem` | |
+| `--step-small` | `0.8125rem` | |
+| `--step-label` | `0.6875rem` | The uppercase mono label |
+
+**Why `clamp()` on the two largest steps only.** `clamp(min, preferred, max)` lets the
+headline scale with the viewport between two hard stops, so it never needs a media
+query and never becomes either unreadably small or absurdly large. Body text is
+deliberately *not* fluid: a body size that changes with window width makes line length
+unpredictable and is worse to read, not better.
+
+### 3.4 Rhythm
+
+`--r-sm: 3px`, `--r-md: 5px`, `--r-lg: 8px`, `--shell: 1240px`, on a 4px base. The
+comment in the source explains the intent better than a table can: *"Radii stay tight;
+this is a calendar, not a bubble."*
 
 ---
 
 ## 4. Layout anatomy
 
-```
-+-- .login-container ------------------------------------------------------+
-| display:flex | min-height:100vh | padding:2rem | bg:#1a1a1c              |
-| justify-content: center  -> centres the card on the MAIN axis (x)        |
-| align-items: center      -> centres the card on the CROSS axis (y)       |
-|                                                                          |
-| +-- .login-card -------------------------------------------------------+ |
-| | display:flex (row) | width:100% | max-width:960px | min-height:600px | |
-| | border-radius:12px | box-shadow: 0 10px 25px rgba(0,0,0,.2)          | |
-| | overflow:hidden  <- clips children to the 12px rounded corners       | |
-| |                                                                      | |
-| | +-- .login-form-section ---+  +-- .login-illustration-section -----+ | |
-| | | flex: 1                  |  | flex: 1                            | | |
-| | |  = grow 1 / shrink 1     |  |  = grow 1 / shrink 1               | | |
-| | |    basis 0%  ==> 50%     |  |    basis 0%  ==> 50%               | | |
-| | |                          |  |                                    | | |
-| | | display: flex            |  | display: none  <- BASE (mobile)    | | |
-| | | flex-direction: column   |  | display: flex  <- @media >=768px   | | |
-| | | justify-content:center   |  | position: relative                 | | |
-| | |  -> main axis is now Y   |  |  <- positioning ancestor for       | | |
-| | | padding: 4rem 3.5rem     |  |     the SVG in login.jsx           | | |
-| | |                          |  | background-color: #22c55e          | | |
-| | | h2.login-title           |  | overflow: hidden                   | | |
-| | | .input-group (x2 or x3)  |  |                                    | | |
-| | |   .input-label           |  | +----------------------------+     | | |
-| | |   .input-wrapper         |  | | <svg> inlined in login.jsx |     | | |
-| | |     position: relative   |  | | position: absolute         |     | | |
-| | |     .input-field         |  | | top: 0; left: 0            |     | | |
-| | |     .password-toggle     |  | | width=100%  height=100%    |     | | |
-| | |       position:absolute  |  | +----------------------------+     | | |
-| | | .form-options            |  |                                    | | |
-| | | .submit-btn              |  |                                    | | |
-| | | .divider ::before/after  |  |                                    | | |
-| | | .social-login            |  |                                    | | |
-| | |   .social-btn            |  |                                    | | |
-| | | .toggle-mode             |  |                                    | | |
-| | +--------------------------+  +------------------------------------+ | |
-| |      50% of the card                    50% of the card              | |
-| +----------------------------------------------------------------------+ |
-+--------------------------------------------------------------------------+
+### 4.1 The landing page (`.ld-`)
+
+A single scrolling column, constrained by `.ui-shell` (`max-width: var(--shell)`,
+auto margins). Sections stack: nav → hero → week grid → loop → rooms → footer.
+
+The **week grid** is the centrepiece and the most interesting layout in the project:
+a 7-column CSS grid of days, each holding availability chips.
+
+```css
+.ld-week__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line-soft);   /* ← this is the divider. See §5.1 */
+}
 ```
 
-Three nested flex containers, each with a different job:
+`minmax(0, 1fr)` rather than plain `1fr` is deliberate: a bare `1fr` has an automatic
+minimum of `min-content`, so one long unbreakable word in a cell can force the whole
+grid wider than its container. `minmax(0, …)` removes that floor. This is the single
+most common cause of a CSS grid that mysteriously overflows.
 
-1. **`.login-container`** — row direction. Centres one child in the viewport.
-2. **`.login-card`** — row direction. Splits into two equal columns.
-3. **`.login-form-section`** — **column** direction. Stacks the form rows and centres
-   the stack vertically. Because the direction flipped, `justify-content: center`
-   means something different here than it does two levels up.
+### 4.2 The auth shell (`.au-`)
+
+A two-column grid — marketing panel left, form right:
+
+```css
+.au { grid-template-columns: minmax(0, 0.86fr) minmax(0, 1fr); }
+```
+
+The form column is deliberately the wider of the two. The panel carries a faint
+gridline field drawn with two repeating `linear-gradient`s at `background-size: 64px
+64px` — a calendar showing faintly through the brand panel, with no image asset.
 
 ---
 
-## 5. Rule-by-rule walkthrough
+## 5. Techniques worth learning
 
-### 5.1 Reset
+These are the non-obvious moves in this design. Each looks like a mistake until you
+know what it is doing.
+
+### 5.1 `gap: 1px` over a background — hairlines without borders
+
+Used in three places: `.ld-week__grid`, `.ld-loop__list` and `.ld-room__list`.
 
 ```css
-* {
-  box-sizing: border-box;
+.ld-loop__list {
+  display: grid;
+  gap: 1px;
+  background: var(--line-soft);   /* container */
+}
+.ld-step {
+  background: var(--surface);     /* every child */
 }
 ```
 
-The default is `content-box`, where `width` describes only the content area and
-padding + border are added on top. A content-box element with `width: 100%` and
-`padding: 1rem` therefore measures `100% + 2rem` and overflows its parent.
-`border-box` redefines `width` as the whole painted box.
+The container is painted `--line-soft`; every child is painted `--surface`; the 1px
+gap between them lets exactly 1px of the container show through. **That sliver is the
+divider.** No `border` anywhere.
 
-This is not decoration — `.input-field` sets `width: 100%` **and**
-`padding: 0.85rem 1rem`. Without this reset, every input would overflow the form
-column by 32px. The universal selector has specificity `0,0,0`, the lowest possible,
-so anything overrides it.
+Why bother, when borders exist? Because borders double up. Give every cell
+`border: 1px` and adjacent cells contribute 2px between them, and the outer edges get
+a border the grid may not want. The classic fixes — `border-right` on all but the last
+child, or negative margins — need `:last-child` rules that break the moment the grid
+reflows to a different column count. The `gap` approach produces exactly one hairline
+between any two cells, at any column count, with no edge cases. It reflows for free.
+
+The cost: **children must be opaque.** A child with a transparent background shows the
+divider colour across its whole box, which reads as a stray grey block. If a cell ever
+looks wrong here, that is the first thing to check.
+
+> Note that `gap: 1px` on `.ld-day__head` and `.ld-chip` is *not* this trick — those
+> are flex containers using 1px as ordinary tight spacing. The trick only applies
+> where the container paints a contrasting background.
+
+### 5.2 `color-mix(in oklab, …)` — deriving colours from tokens
+
+Nine usages across the three files, all of the same shape:
 
 ```css
-body {
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+border-color: color-mix(in oklab, var(--spruce) 30%, var(--line));
+```
+
+This blends 30% spruce into the ordinary line colour, producing a border that is
+recognisably "spruce-flavoured" without introducing a new token for every tint.
+
+**Why `oklab` rather than the default sRGB.** Mixing in sRGB interpolates the raw
+channel numbers, which do not correspond to how the eye perceives lightness. Blends
+pass through muddy, desaturated middles — the notorious grey halfway point between
+blue and yellow. `oklab` is a perceptually uniform space: equal numeric steps look
+like equal visual steps, so a 30% mix actually looks 30% of the way there. For a
+design deriving many tints from a handful of tokens, that difference is visible.
+
+`color-mix()` is Baseline across current browsers. It has no fallback here, so on a
+browser without it those borders fall back to the browser's invalid-value handling —
+an acceptable trade for a project targeting modern browsers, but worth knowing it is a
+trade.
+
+### 5.3 `font-stretch` on Archivo's variable `wdth` axis
+
+Six declarations across the three files, at **112%, 115%, 116% and 118%** — on `h1`–
+`h4` in `index.css`, and on the panel and page titles.
+
+This works **only** because `index.html` requests the variable width axis:
+
+```
+family=Archivo:wdth,wght@100..125,400..800
+        ^^^^
+```
+
+Drop the `wdth,` from that URL — or let the font fail to load so a fallback takes
+over — and every one of those declarations becomes a silent no-op. Nothing errors, no
+warning appears; the headlines simply render at normal width and the design flattens.
+
+**It is the least visible way to break this UI**, which is why it is called out in
+`index.html`, in `04-frontend.md` §4.3, and again here.
+
+### 5.4 `order: -1` — putting the form above the marketing panel on mobile
+
+```css
+@media (max-width: 900px) {
+  .au { grid-template-columns: minmax(0, 1fr); }
+  .au-main { order: -1; }
 }
 ```
 
-`margin: 0` kills the user-agent stylesheet's default 8px body margin. Left in, it
-would show as a dark gutter and would push the `min-height: 100vh` container 16px
-past the viewport, producing a permanent scrollbar. (`padding: 0` is already the UA
-default; it is stated for clarity, not effect.)
+In source order the marketing panel comes first, which is correct on desktop where it
+sits on the left. Collapsed to one column it would sit *on top* — so somebody arriving
+at `/login` on a phone would scroll past marketing copy to reach the password field.
 
-The **system font stack** requests a face the OS already ships rather than
-downloading a webfont — text paints on the first frame with no flash of unstyled text
-and no layout shift. First match wins:
+`order: -1` on the form pulls it in front. **The DOM is untouched**, so tab order and
+screen-reader order still follow the source. That is worth noting as a caveat as much
+as a technique: `order` changes only the visual sequence, and using it to reorder
+*interactive* content can desynchronise what a sighted user sees from what a keyboard
+user traverses. It is safe here precisely because the panel it jumps is
+non-interactive.
 
-| Entry | Resolves to |
-| --- | --- |
-| `-apple-system` | San Francisco on macOS/iOS (Safari, Firefox) |
-| `BlinkMacSystemFont` | the same San Francisco, spelled the way Chrome-on-macOS wants it |
-| `"Segoe UI"` | Windows — quoted because the family name contains a space |
-| `Roboto` | Android, Chrome OS |
-| `Helvetica`, `Arial` | older macOS / older Windows |
-| `sans-serif` | the generic family; last resort, always resolves |
+### 5.5 The 560px week-grid transformation
 
-### 5.2 Layout container
+The most aggressive responsive move in the project. Below 560px, seven columns cannot
+work, so the grid stops being a grid:
 
 ```css
-.login-container {
-  display: flex;
-  min-height: 100vh;
-  background-color: #1a1a1c;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
-}
+.ld-week__grid { display: flex; flex-direction: column; }
 ```
 
-Row-direction flex, so the **main** axis is horizontal and the **cross** axis is
-vertical — which is exactly what makes `justify-content: center` centre horizontally
-and `align-items: center` centre vertically. Two declarations replace the old
-`position: absolute; top: 50%; transform: translate(-50%,-50%)` recipe.
-
-`min-height: 100vh` rather than `height: 100vh` is the important choice. `100vh` is
-exactly one viewport tall; as a hard `height` it would **clip** the card, which itself
-demands 600px plus this 2rem of padding. `min-height` reads as "at least a full
-viewport, taller if the content needs it", so a short window scrolls instead of
-cutting the form off.
-
-Thanks to the `border-box` reset, the 2rem padding is subtracted from the 100vh
-rather than added to it.
-
-### 5.3 Card
+Each day becomes a full-width row. The source comments explain the rest, and are worth
+quoting exactly:
 
 ```css
-.login-card {
-  display: flex;
-  width: 100%;
-  max-width: 960px;
-  background-color: #ffffff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  min-height: 600px;
-}
-```
+/* One row per day: label on the left, that day's slots flowing beside it. */
 
-- `width: 100%` + `max-width: 960px` — fluid below the cap, fixed above it, so line
-  lengths stay readable on a wide monitor.
-- **`overflow: hidden` is load-bearing.** `border-radius` rounds the card, but the
-  green `.login-illustration-section` paints right up to the card's edge and would
-  cover those rounded corners, squaring off the right-hand side. Clipping descendants
-  to the rounded shape is what keeps the green panel's corners curved. Delete this
-  line and the bug appears on the right side only, which makes it confusing to
-  diagnose.
-- `min-height: 600px` stops the card resizing when `login.jsx` toggles between sign-in
-  (shorter) and register (an extra Name field, no options row). Without a floor, the
-  whole card would jump every time the user flips modes.
-
-### 5.4 Form section
-
-```css
-.login-form-section {
-  flex: 1;
-  padding: 4rem 3.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-```
-
-`flex: 1` expands to `flex-grow: 1; flex-shrink: 1; flex-basis: 0%`. **The `0%` basis
-is the part that matters.** Each panel starts from zero width, then all of the card's
-width is handed out in equal 1:1 grow shares — a true 50/50 split regardless of
-content. Compare `flex: auto` (basis `auto`), which starts each panel at its natural
-content width and produces a lopsided split. The illustration panel declares the same
-`flex: 1`; that pairing is what makes the halves equal.
-
-This panel is *also* a flex container, but `flex-direction: column`, so its main axis
-runs vertically — which is why `justify-content: center` here centres the form rows
-**vertically** inside the 600px card. Cross-axis alignment is left at `stretch`, so
-each row still spans the full column width.
-
-### 5.5 Illustration section
-
-```css
-.login-illustration-section {
-  flex: 1;
-  background-color: #22c55e;
+/* The day label is taken out of flow and the row is padded past it, so a
+   third slot wraps into line with the first two instead of sliding back
+   under the label. */
+.ld-day {
   position: relative;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  flex-wrap: wrap;
+  padding: 8px 14px 8px 92px;   /* ← 92px reserves the label column */
 }
-
-@media (min-width: 768px) {
-  .login-illustration-section {
-    display: flex;
-  }
-}
-```
-
-**Mobile-first.** The base rule is the *phone* rule: `display: none` removes the
-illustration from the layout entirely, so a narrow screen shows the form column alone
-at full width. The `@media (min-width: 768px)` block is the **desktop enhancement**
-that switches it back on. Base = small screen, media query = larger screen, written
-with `min-width` — that is the definition of mobile-first. The desktop-first inverse
-would set `display: flex` here and use `max-width` queries to take things away.
-
-A media query adds **no specificity**. Both selectors are a single class (`0,1,0`), so
-the override wins purely on **source order**. Move the `@media` block above the base
-rule and the panel would never appear.
-
-**`position: relative` couples this file to `login.jsx`.** The `<Illustration/>`
-component renders its `<svg>` with an inline
-`style={{position: 'absolute', top: 0, left: 0}}`. An absolutely positioned element
-is laid out against its nearest **positioned ancestor** — the closest ancestor whose
-`position` is anything but `static`. This rule is that ancestor. Remove it and the
-SVG escapes to the initial containing block and lands in the top-left corner of the
-*page*, over the form. Neither file can be changed safely in ignorance of the other.
-
-`overflow: hidden` clips the artwork, whose paths deliberately run outside the
-`0 0 400 500` viewBox (`M -50,300 …`).
-
-> **Dead declarations:** `align-items` and `justify-content` do nothing here. They
-> are obviously inert while `display: none` holds, but they stay inert after the
-> media query restores `display: flex` too — the panel's only child is absolutely
-> positioned, therefore out of flow, therefore not a flex item.
-
-### 5.6 Typography
-
-```css
-.login-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 2rem;
-  text-align: center;
-}
-```
-
-`1.875rem` = 30px at the default root size (Tailwind's `text-3xl` step), in `rem` so
-it grows with the user's browser setting. `#111827` is near-black rather than pure
-`#000`, which reads harsh on white. Only `margin-bottom` is set, so the `<h2>`'s UA
-top margin survives — harmless here, because the parent column centres its content
-vertically anyway.
-
-### 5.7 Inputs
-
-```css
-.input-group  { margin-bottom: 1.25rem; }
-
-.input-label {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #6b7280;
-  margin-bottom: 0.4rem;
-}
-
-.input-wrapper { position: relative; }
-```
-
-`.input-group` supplies the 20px vertical rhythm — `margin-bottom` rather than
-`margin-top` so the first field sits tight under the heading and spacing never
-doubles.
-
-A `<label>` is `display: inline` by default, which would drop it beside the field and
-would ignore vertical margins entirely. `display: block` fixes both. The label is
-`#6b7280` (grey-500), deliberately quieter than the value the user types (`#1f2937`).
-
-`.input-wrapper` is `position: relative` with **no offsets**, so it moves nothing —
-it exists purely to become the positioning ancestor for `.password-toggle` (§5.8). It
-wraps every field, not only the password one, so all rows stay structurally identical
-in the JSX.
-
-```css
-.input-field {
-  width: 100%;
-  padding: 0.85rem 1rem;
-  background-color: #f3f4f6;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  color: #1f2937;
-  outline: none;
-  transition: border-color 0.2s, background-color 0.2s;
-}
-
-.input-field:focus {
-  border-color: #22c55e;
-  background-color: #ffffff;
-}
-
-.input-field::placeholder {
-  color: #9ca3af;
-}
-```
-
-**`border: 1px solid transparent`, not `border: none`.** The 1px border box is
-reserved up front and simply invisible, so `:focus` changes only its *colour* and
-nothing reflows. Declaring `border: none` and adding a border on focus would nudge
-the whole form by a pixel every time focus moved.
-
-**`outline: none` is an accessibility regression** — see §8.1. It is flagged in the
-stylesheet and deliberately left unchanged.
-
-**`transition: border-color 0.2s, background-color 0.2s`** animates precisely the two
-properties `:focus` changes, over 200ms. The properties are named rather than using
-`transition: all` because `all` would animate every animatable property, including
-layout-triggering ones (`width`, `height`, `padding`, `font-size`) added to the rule
-months later — expensive on every frame — and because with `all` you can no longer
-tell from the CSS what is supposed to move.
-
-`:focus` is a **pseudo-class** (single colon): the same element, matched only while
-it is in a state. Its specificity is `0,2,0` against `.input-field`'s `0,1,0`, so it
-wins while the state holds and falls back the instant focus leaves — no JavaScript.
-
-`::placeholder` is a **pseudo-element** (double colon): it styles a fragment the
-browser generates internally, the greyed hint text, which has no DOM node you could
-select. `#9ca3af` is lighter than the typed-value colour so a placeholder is never
-mistaken for real content. Placeholders are hints, not labels — they vanish on the
-first keystroke, which is why `login.jsx` also renders a real `<label>` per field.
-
-### 5.8 Password toggle
-
-```css
-.password-toggle {
+.ld-day__head {
   position: absolute;
-  right: 1rem;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #9ca3af;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
 }
 ```
 
-The "button parked inside an input" trick, in two halves:
+The `92px` left padding and the absolutely positioned label are **one mechanism, not
+two**. If the label stayed in flow, wrapped chips would flow back underneath it and
+the rows would lose their left alignment. Taking it out of flow and reserving its
+width with padding keeps every chip in a clean column no matter how many wrap.
 
-1. `.input-wrapper` is `position: relative` → it becomes the positioning ancestor.
-2. this button is `position: absolute` → it leaves normal flow (so the input still
-   spans the full width, unaffected) and positions against that wrapper's box.
-
-`right: 1rem` pins it 16px in from the wrapper's right edge, floating over the
-input's own right padding.
-
-**The vertical-centring idiom.** These two lines only work as a pair:
-
-| Line | Effect |
-| --- | --- |
-| `top: 50%` | puts the element's **top edge** at the wrapper's midpoint — which leaves it sitting too *low* by half its own height |
-| `transform: translateY(-50%)` | pulls it back up by 50% **of its own height** |
-
-A percentage inside `transform` resolves against the element's own box — that is the
-whole point, since nothing has to know how tall the icon is. Transform also only
-moves the painted result, so nothing reflows. (`align-items: center` on the wrapper
-cannot substitute: an absolutely positioned child is out of flow and is not a flex
-item.)
-
-The rest strips the `<button>` back to a bare icon. `display: flex; align-items:
-center` removes the inline descender gap under the 20×20 SVG. The `color: #9ca3af`
-reaches the icon through `stroke="currentColor"` in `login.jsx` — another coupling
-between the two files.
-
-### 5.9 Form options
-
-```css
-.form-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  font-size: 0.85rem;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  color: #4b5563;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.checkbox-input {
-  margin-right: 0.5rem;
-  accent-color: #22c55e;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 4px;
-}
-
-.forgot-password { color: #22c55e; text-decoration: none; font-weight: 600; }
-.forgot-password:hover { text-decoration: underline; }
-```
-
-`justify-content: space-between` is the two-ends row: first item flush left, last
-flush right, all leftover space dumped in the middle. No floats, no width arithmetic,
-and it stays correct when the label text is translated.
-
-`.checkbox-label` is itself a flex row so the native checkbox and its text share a
-vertical centre. `cursor: pointer` is honest here — the `<input>` is nested *inside*
-the `<label>` in the JSX (implicit label association), so clicking the words really
-does toggle the box, no `for`/`id` needed.
-
-**`accent-color`** is the modern one-line way to theme a *native* control: the browser
-tints the checked state with the brand green and picks a readable tick colour itself.
-The same property works on radios, `<input type=range>` and `<progress>`. Before it
-existed the only route was to hide the real input and rebuild the box from a
-pseudo-element, silently discarding keyboard behaviour, the indeterminate state and
-screen-reader semantics.
-
-**`border-radius: 4px` on the checkbox is a no-op** — see §8.6.
-
-`text-decoration: none` on the link trades the underline for colour + weight; the
-`:hover` rule brings the underline back, because colour alone is a weak affordance
-(and hover does not exist on touch at all).
-
-### 5.10 Submit button
-
-```css
-.submit-btn {
-  width: 100%;
-  padding: 0.85rem;
-  background-color: #22c55e;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.submit-btn:hover { background-color: #16a34a; }
-```
-
-Full-bleed primary action. `width: 100%` plus `border-box` means the padding stays
-inside that width, so the button's edges line up exactly with the `.input-field`
-boxes above. The 8px radius is copied from the inputs so the button reads as part of
-the same stack. White on `#22c55e` is the highest-emphasis pairing on the card — which
-is what a single primary action should be.
-
-`#16a34a` is green-600, one stop darker than the green-500 resting colour: the
-conventional "hover = one shade darker" move, taken from the ramp rather than
-invented, which is what keeps the palette coherent. Only `background-color` is
-transitioned, because it is the only property that changes.
-
-### 5.11 Divider
-
-```css
-.divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 1.5rem 0;
-  color: #6b7280;
-  font-size: 0.85rem;
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.divider::before { margin-right: 1rem; }
-.divider::after  { margin-left: 1rem; }
-```
-
-In the JSX this element contains nothing but a text node. Both hairlines are
-generated entirely in CSS, so the markup stays clean. The container is a flex row
-holding three items: the `::before` line, an anonymous flex item wrapping the text,
-and the `::after` line.
-
-The "line — text — line" pattern needs exactly three things:
-
-| Declaration | Why it is required |
-| --- | --- |
-| `content: ''` | **Mandatory.** A pseudo-element whose `content` is unset is *not generated at all* — the box does not exist and every other declaration in the rule is ignored. The empty string is what brings the box into being. |
-| `flex: 1` | each side grows into whatever space the text does not use; two equal `1` shares keep the text centred whatever its length (`"Or sign in with"` vs `"Or register with"`, which the JSX swaps between) |
-| `border-bottom` | the visible rule. The generated box has no content and therefore no height, so its bottom border *is* the line. |
-
-`::before` is inserted as the first child and `::after` as the last, which is exactly
-the order needed to bracket the text. The margins are split into two rules so each
-line gets space on its **inner** edge only, leaving the outer edges flush.
-
-> `text-align: center` on `.divider` is inert once flexbox is laying out the children
-> — the text item is sized to its content, so there is no spare inline space to align
-> within.
-
-### 5.12 Social login
-
-```css
-.social-login {
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-}
-
-.social-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  background-color: #fef2f2;
-  border: none;
-  border-radius: 24px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  width: 60px;
-  height: 40px;
-}
-
-.social-btn:hover { background-color: #fee2e2; }
-```
-
-`gap` is flexbox's own spacing property: it puts 1rem *between* items with no outer
-margin, so adding a second provider later needs no `:last-child { margin: 0 }`
-clean-up. Today only the Google button renders, so `justify-content: center` simply
-centres it.
-
-**`border-radius: 24px` on a 40px-tall box is a pill, not a 24px rounded rectangle.**
-Any radius at or above half the height (20px here) is clamped by the browser to
-exactly half, turning the short sides into perfect semicircles. Deliberately
-over-stating the number — `24px`, or the common `999px` — is the standard shorthand
-for "fully rounded, whatever the height turns out to be", so the shape survives a
-change in height.
-
-With the fixed 60×40 size and both centring properties in place, the `padding` no
-longer positions anything; it only guarantees an inner gutter if the fixed dimensions
-are ever removed.
-
-> `login.jsx` puts `className="social-btn google-btn"` on this button, but
-> **`.google-btn` is not defined anywhere in the stylesheet.** It is a dead class —
-> either a leftover, or a hook someone intended to use for per-provider theming.
-
-### 5.13 Toggle mode
-
-```css
-.toggle-mode {
-  margin-top: 1.5rem;
-  text-align: center;
-  font-size: 0.875rem;
-  color: #4b5563;
-}
-
-.toggle-mode-btn {
-  background: none;
-  border: none;
-  color: #22c55e;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 0.25rem;
-}
-
-.toggle-mode-btn:hover { text-decoration: underline; }
-```
-
-A real `<button>` styled to look like a link — and that is the *correct* choice, not
-a compromise. The control performs an in-page action (flipping React state between
-sign-in and register) rather than navigating to a URL, so it belongs on `<button>`
-for keyboard and screen-reader semantics while *looking* like the inline link the
-sentence needs. The brand green at weight 600 matches `.forgot-password`, so the two
-read as one family; the `0.25rem` left margin is the word space after "Don't have an
-account?".
-
-Worth contrasting with §5.7: nothing here removes the outline, so this button keeps
-its native focus ring and is fully visible to keyboard users. The text inputs are the
-only controls carrying the regression.
+`top: 50% + translateY(-50%)` is the standard vertical centring idiom for an absolute
+box of unknown height: `top: 50%` puts its *top edge* at the middle, then the
+transform pulls it back up by half its own height.
 
 ---
 
 ## 6. Responsive behaviour
 
-There is exactly **one** breakpoint in the entire stylesheet:
-`@media (min-width: 768px)`, and it changes exactly **one** declaration.
+All three files are **desktop-first** — every query is `max-width`, overriding a base
+rule written for the widest case.
 
-| | `< 768px` (base / mobile) | `>= 768px` (enhancement) |
-| --- | --- | --- |
-| `.login-illustration-section` | `display: none` — removed from the layout | `display: flex` — visible |
-| Card layout | one column | two columns |
-| Form column width | 100% of the card | 50% of the card (`flex: 1` on both) |
-| Green panel + SVG | not rendered at all | rendered, clipped to the card's radius |
-| Card `max-width` | 960px (never reached below 1024px viewport) | 960px, reached at a 1024px viewport |
-| `min-height: 600px` | applies | applies |
-| Container padding | `2rem` | `2rem` |
-| Form padding | `4rem 3.5rem` | `4rem 3.5rem` |
-| Font sizes | unchanged | unchanged |
+| Breakpoint | `index.css` | `landing.css` | `authShell.css` |
+| --- | :---: | :---: | :---: |
+| 1040px | | ✓ | |
+| 900px | | ✓ | ✓ |
+| 720px | ✓ | ✓ | ✓ |
+| 560px | | ✓ | |
+| 520px | | | ✓ |
+| 380px | | ✓ | |
 
-### The arithmetic, which exposes a real problem
+> **A real inconsistency:** `landing.css` breaks at **560px** and `authShell.css` at
+> **520px**, for the same "narrow phone" case. 900px and 720px are shared, so the
+> divergence is almost certainly accidental rather than intentional. Nothing is broken
+> — the two files style disjoint pages — but a shared breakpoint set (ideally as
+> tokens) would stop the two drifting further. Logged in §8.
 
-The last three rows never change, and that hurts at both ends of the range:
-
-| Viewport | Card width | Form column | Usable content width |
-| ---: | ---: | ---: | ---: |
-| 360px (phone) | 296px | 296px | **184px** |
-| 767px (just below the breakpoint) | 703px | 703px | 591px |
-| 768px (at the breakpoint) | 704px | 352px | **240px** |
-| 1024px+ (capped) | 960px | 480px | 368px |
-
-*(card = viewport − 2 × 2rem container padding, capped at 960; content = column −
-2 × 3.5rem form padding.)*
-
-Two things fall out of that table:
-
-1. **On a 360px phone the form has 184px of usable width** — 112px of the 296px card
-   is horizontal padding. The email placeholder `example.email@gmail.com` will not
-   fit.
-2. **The form column gets *narrower* as the screen gets wider.** Crossing 768px takes
-   the usable width from 591px down to 240px in a single pixel, because the
-   illustration claims half the card while the padding stays fixed. It is the
-   narrowest the form ever is.
-
-Neither is caused by the mobile-first pattern itself — the pattern is right. The fix
-would be to scale `.login-form-section`'s padding at the breakpoints too, e.g. a
-smaller base padding with the generous `4rem 3.5rem` moved into a `min-width: 960px`
-query. Recorded here, not applied.
+Media queries **add no specificity**. `@media (max-width: 900px) { .au-main { … } }` is
+still `(0,1,0)` and beats the base rule purely because it appears later in the file.
+Move a media block above the rule it overrides and it silently stops working — one of
+the most confusing CSS bugs there is, and the same source-order mechanism that governs
+the `index.css`-first import rule.
 
 ---
 
-## 7. CSS concepts primer, demonstrated by this file
+## 7. CSS concepts primer, demonstrated by this codebase
 
-Each concept below is anchored to a real line you can go and read.
+Each concept is anchored to a real rule you can go and read.
 
 ### Box model / `border-box`
-Every element is content + padding + border + margin. `box-sizing` decides which of
+Every element is content + padding + border + margin; `box-sizing` decides which of
 those `width` refers to. `content-box` (the default) = content only; `border-box` =
 content + padding + border.
-**Here:** `* { box-sizing: border-box }` is what lets `.input-field` set
-`width: 100%` *and* `padding: 0.85rem 1rem` without overflowing.
+**Here:** `*, *::before, *::after { box-sizing: border-box }` at the top of
+`index.css` is what lets `.ui-field__input` carry `padding: 0 14px` and a 1px border
+inside a full-width field without overflowing its column.
 
 ### Flexbox: main axis vs cross axis
-`display: flex` creates a container whose children become flex items laid out along a
-**main** axis; the perpendicular one is the **cross** axis. `flex-direction` decides
-which is which, and *that decides what `justify-content` and `align-items` mean*.
-**Here:** `.login-container` is `row`, so `justify-content: center` centres
-horizontally. `.login-form-section` is `column`, so the *same* declaration centres
-vertically. Same property, opposite effect, because the direction changed.
+`display: flex` lays children along a **main** axis; the perpendicular one is the
+**cross** axis. `flex-direction` decides which is which — *and that decides what
+`justify-content` and `align-items` mean*.
+**Here:** `.ui-slot` is a row, so `align-items` controls vertical alignment.
+`.au-panel` is a column, so the same property controls horizontal alignment. Same
+declaration, perpendicular effect, because the direction changed.
 
 ### The `flex` shorthand
 `flex: 1` = `flex-grow: 1; flex-shrink: 1; flex-basis: 0%`.
-**Here:** both card panels declare `flex: 1`, and the `0%` basis is what makes the
-split exactly 50/50 rather than proportional to their content.
+**Here:** `.au-or::before` and `::after` are both `flex: 1`, and the `0%` basis is
+what makes the two hairlines beside the word "or" exactly equal, rather than
+proportional to any content.
+
+### Grid: `minmax(0, 1fr)`
+**Here:** every grid track in the project uses `minmax(0, 1fr)` rather than `1fr`. A
+bare `1fr` has an automatic minimum of `min-content`, so one long unbreakable string
+can push the whole grid wider than its container. See §4.1.
 
 ### Absolute positioning + the positioning ancestor
 An absolutely positioned element leaves normal flow and is placed against its nearest
 ancestor whose `position` is not `static`.
-**Here:** `.input-wrapper { position: relative }` is the ancestor for
-`.password-toggle { position: absolute }`; `.login-illustration-section
-{ position: relative }` is the ancestor for the SVG's inline `position: absolute`.
+**Here:** `.ld-day { position: relative }` is the ancestor for
+`.ld-day__head { position: absolute }` in the 560px block (§5.5). Remove the
+`relative` and the label flies to the top-left of the page.
 
 ### Pseudo-elements (`::`)
-A box the browser generates that has no node in the DOM.
-**Here:** `.divider::before` / `::after` are the two hairlines, and
-`.input-field::placeholder` styles the browser-generated hint text.
-`content: ''` is what makes a generated box exist at all.
+A box the browser generates that has no node in the DOM. `content: ''` is what makes
+it exist at all.
+**Here:** `.au-or::before` / `::after` are the two divider hairlines,
+`.ui-pill::before` is the status dot, and `.ui-field__input::placeholder` styles
+browser-generated text.
 
 ### Pseudo-classes (`:`)
-A conditional match on the *same* element based on its state.
-**Here:** `:focus` (`.input-field:focus`) and `:hover`
-(`.submit-btn:hover`, `.social-btn:hover`, `.forgot-password:hover`,
-`.toggle-mode-btn:hover`). No JavaScript, no class toggling.
+A conditional match on the *same* element, based on its state.
+**Here:** `:hover` (`.ui-btn`, `.au-google`), `:focus` (`.ui-field__input`),
+`:focus-visible` (the global ring), `:last-child` (`.au-steps li`). No JavaScript, no
+class toggling.
 
 ### Transitions
-Interpolate a property between its old and new computed values over a duration.
-**Here:** three declarations, all naming their properties explicitly:
-`.input-field` (border-color + background-color), `.submit-btn` and `.social-btn`
-(background-color). Never `all` — see §5.7.
+Interpolate a property between old and new computed values over a duration.
+**Here:** `.ui-field__input` transitions `border-color, box-shadow`; `.au-google`
+transitions `border-color, background`. **Never `all`** — `all` animates properties
+you did not intend, including ones added later, and forces the browser to check every
+property on every change.
 
 ### Media queries
-Apply a block only when a condition about the viewport holds. `min-width` = "this
-width or wider" (mobile-first); `max-width` = "this width or narrower"
-(desktop-first).
-**Here:** the single `@media (min-width: 768px)` block that reveals the illustration.
+Apply a block only when a viewport condition holds. `min-width` = "this width or
+wider" (mobile-first); `max-width` = "this width or narrower" (desktop-first).
+**Here:** all three files are desktop-first — see §6.
 
 ### Specificity
-When two rules set the same property, the more specific selector wins, scored as
-(ids, classes/attributes/pseudo-classes, elements).
-**Here:** `*` = `0,0,0`. `.input-field` = `0,1,0`. `.input-field:focus` = `0,2,0` —
-which is why the focus state overrides the resting state. Nothing in this file uses
-an id selector or `!important`, which is a good sign.
+Scored as (ids, classes/attributes/pseudo-classes, elements). The higher score wins.
+**Here, with a consequence worth understanding:**
+
+```css
+:focus-visible          { outline: 2px solid var(--spruce); }  /* (0,1,0) */
+.ui-field__input:focus  { outline: none; box-shadow: 0 0 0 3px var(--spruce-tint); }
+                                                               /* (0,2,0) */
+```
+
+Both match when you tab into a text input, and the **second wins** — a class plus a
+pseudo-class outscores a lone pseudo-class. So text inputs never receive the global
+outline; their focus indicator is the 3px `box-shadow` ring instead. That is
+deliberate and it is a genuine, visible indicator — but it is why you cannot find the
+outline in devtools when you go looking for it. See §8.
 
 ### The cascade
-When specificity ties, the rule that appears **later in the source** wins. Media
-queries add no specificity of their own.
-**Here:** `@media (min-width: 768px) { .login-illustration-section { display: flex } }`
-beats the base `display: none` on source order alone (`0,1,0` vs `0,1,0`). Move the
-media block above the base rule and the illustration never appears — a genuinely
-confusing bug if you do not know this rule.
+When specificity ties, the rule appearing **later in source order** wins.
+**Here:** this single mechanism explains three separate things in this project — why
+`index.css` must be imported before page CSS (§1), why media queries must sit below
+the rules they override (§6), and why the namespace convention matters (§2). Nothing
+in these files uses an id selector or `!important` except the
+`prefers-reduced-motion` guard, where `!important` is correct.
 
 ---
 
 ## 8. Known issues
 
-### 8.1 `outline: none` — accessibility regression
-`.input-field` removes the browser's focus ring. That ring is how keyboard users
-(Tab), switch-device users and screen-magnifier users know where they are; removing it
-is a **WCAG 2.4.7 "Focus Visible"** failure.
+| # | Issue | Where | Detail |
+| --- | --- | --- | --- |
+| 1 | **Divergent narrow breakpoints** | `landing.css` 560px vs `authShell.css` 520px | Same "narrow phone" case, two numbers, almost certainly accidental. Nothing breaks today because the files style disjoint pages. Breakpoints as tokens would prevent drift. |
+| 2 | **Focus ring is invisible in forced-colors mode** | `index.css:470` | `.ui-field__input:focus` sets `outline: none` and substitutes a `box-shadow` ring. That is a real, visible indicator in normal rendering — but Windows High Contrast / `forced-colors` mode discards `box-shadow` while preserving `outline`, so text inputs lose their focus indicator entirely there. Fix is a `@media (forced-colors: active)` block restoring an outline. |
+| 3 | **Focus ring does not distinguish keyboard from pointer** | `index.css:470` | The input rule keys off `:focus`, not `:focus-visible`, so the ring also appears on mouse click. Cosmetic, and arguably desirable on form fields; noted for consistency with the rest of the system, which uses `:focus-visible`. |
+| 4 | **Icons are mostly not marked decorative** | `components/Icons.tsx` | Not a CSS issue but it lands here: `Brand.tsx` sets `aria-hidden="true"` + `focusable="false"`, and 3 of ~28 icons in `Icons.tsx` do. All are decorative and should be hidden from assistive tech. |
+| 5 | **No dark mode** | all three files | Every token is a light value; there is no `prefers-color-scheme` block. Because all colour flows from one `:root`, adding it later is a contained change — which is most of the argument for the token system. |
+| 6 | **`color-mix()` has no fallback** | 9 usages | Baseline in current browsers; on one without support those borders take the browser's invalid-value path. An acceptable trade, but a deliberate one. |
 
-It is *partially* compensated — `:focus` repaints the border green and the background
-white, which is a real visible change — but a 1px green hairline is a weak indicator,
-and `#22c55e` on `#ffffff` is roughly 2:1 contrast, under the 3:1 minimum WCAG asks of
-a non-text focus indicator.
+### Findings that are now closed
 
-The correct approach keeps a ring on `:focus-visible`, which fires for keyboard focus
-but not mouse clicks:
+Both were listed as open in `08-gaps-and-findings.md` before this pass and are
+**corrected there as of 2026-09-06**:
 
-```css
-.input-field:focus-visible {
-  outline: 2px solid #16a34a;
-  outline-offset: 2px;
-}
-```
-
-Flagged in the stylesheet, deliberately not applied.
-
-### 8.2 Hardcoded colours, no custom properties
-24 colour literals, none named (§3.1). A rebrand is 17 find-and-replaces across the
-green + grey system alone, and `#ffffff` / `white` already disagree on spelling.
-
-### 8.3 Global scope
-`*` and `body` are set from a page-level file, and every class name sits in one shared
-namespace (§2). `register.jsx` will collide on `.input-field`, `.submit-btn`,
-`.divider` and `.social-btn` the moment it ships a stylesheet.
-
-### 8.4 No dark mode
-There is no `@media (prefers-color-scheme: dark)` block anywhere. The card is
-hardcoded `#ffffff`, the page `#1a1a1c`, and the SVG's colours are baked into the JSX
-where CSS cannot reach them. Dark mode is not currently expressible without §8.2 being
-fixed first.
-
-### 8.5 No `prefers-reduced-motion` guard
-Three `transition` declarations animate unconditionally. At 200ms on colour changes
-the risk is genuinely low, but there is no opt-out for users who ask their OS for
-reduced motion. The standard guard:
-
-```css
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
-```
-
-### 8.6 `border-radius` on a native checkbox is a no-op
-`.checkbox-input { border-radius: 4px }` does nothing in most browsers — a checkbox is
-painted as a native widget and ignores the property. Rounding one actually requires
-`appearance: none` and rebuilding the control by hand, which would also throw away the
-`accent-color` win directly above it. Harmless, but misleading to read.
-
-### 8.7 Dead declarations and classes
-| What | Where | Why it is dead |
-| --- | --- | --- |
-| `align-items`, `justify-content` | `.login-illustration-section` | its only child is out of flow, so it is not a flex item |
-| `text-align: center` | `.divider` | flexbox sizes the text item to its content; no spare inline space |
-| `padding: 0.5rem 1rem` | `.social-btn` | fixed 60×40 plus both centring properties make it inert |
-| `.google-btn` | applied in `login.jsx`, never defined in the CSS | no matching rule exists |
-
-### 8.8 Fixed padding at every viewport
-See §6: 184px of usable form width on a 360px phone, and the form column is at its
-*narrowest* immediately after the 768px breakpoint.
-
-### 8.9 Adjacent, in `login.jsx` (not this file's fault, but it touches `.input-label`)
-The Name / Email / Password `<label class="input-label">` elements have no `htmlFor`
-and their inputs have no `id`, so they are not programmatically associated — clicking
-a label does not focus its field, and a screen reader may not announce it. Only
-`.checkbox-label` is correct, because it nests its input. Already annotated in
-`login.jsx`.
+- **`outline: none` losing the focus ring (A1).** The old `login.css` removed the
+  outline and compensated with only a border/background tint. `index.css` now ships a
+  global `:focus-visible { outline: 2px solid var(--spruce); outline-offset: 2px }`,
+  and the one place that still sets `outline: none` immediately replaces it with a 3px
+  `box-shadow` ring. The residual is the forced-colors case in row 2 above — much
+  narrower than the original finding.
+- **No `prefers-reduced-motion` guard (A7).** `index.css:557` ships the standard
+  universal guard, clamping `animation-duration`, `animation-iteration-count` and
+  `transition-duration` to `0.01ms !important` across `*, *::before, *::after`.
+  Because it is universal, the page stylesheets correctly do not repeat it.
 
 ---
 
-## 9. If you want to refactor later
+## 9. Historical: what `login.css` did, and why it was replaced
 
-Both options below are presented as options. **Neither has been applied.**
+`frontend/src/pages/login.css` was deleted on 2026-09-06. It is described here because
+the current system is best understood as a set of answers to its specific problems.
 
-### Option A — CSS custom properties on `:root`
+| What `login.css` did | Why it was a problem | What replaced it |
+| --- | --- | --- |
+| Hardcoded colour literals throughout — `#22c55e` brand green, `#9ca3af` on `.password-toggle`, and others | The same green appeared in several files with no single definition. Changing the brand meant grepping hex codes, and any missed one was invisible until someone noticed. | ~34 tokens in one `:root`; page stylesheets define zero |
+| Bare `*` and `body` rules inside a *page* stylesheet | Importing one page's CSS restyled the entire document. Two pages could not coexist. | The reset lives in `index.css`, which is global on purpose; page files style only their own namespace |
+| Generic class names — `.input-field`, `.divider`, `.submit-btn`, `.login-card` | A flat global namespace with no prefixes. The second screen was guaranteed to collide. | `ui-` / `.ld-` / `.au-` prefixes (§2) |
+| `outline: none` on `.input-field` with only a border tint to compensate | Keyboard users effectively lost the focus indicator. | Global `:focus-visible` ring + an explicit 3px `box-shadow` ring on inputs (§8) |
+| No `prefers-reduced-motion` guard | Vestibular-sensitive users got every transition regardless. | The universal guard at `index.css:557` |
+| One `@media (min-width: 768px)` block, mobile-first | Not wrong, but inconsistent with everything written since. | Desktop-first `max-width` queries throughout (§6) |
+| `border-radius` on a native checkbox (a no-op), and dead declarations | Accumulated cruft nobody had cause to revisit. | Gone with the file |
 
-The smallest change with the biggest payoff. It fixes §8.2 and unlocks §8.4 without
-touching a single line of JSX, because the class names stay identical.
+**The lesson worth keeping:** none of those were mistakes at the time. They are what a
+single-screen stylesheet looks like. They became problems at exactly the moment a
+second screen existed — which is the general shape of CSS debt. It is invisible until
+the thing it prevents is the thing you need to do next.
 
-**Before**
+---
 
-```css
-.submit-btn        { background-color: #22c55e; }
-.submit-btn:hover  { background-color: #16a34a; }
-.forgot-password   { color: #22c55e; }
-.input-field       { background-color: #f3f4f6; color: #1f2937; }
-```
+## 10. When to revisit this approach
 
-**After**
+The convention-based scoping is right for three stylesheets. Two signals that it has
+stopped being right:
 
-```css
-:root {
-  --brand:        #22c55e;
-  --brand-hover:  #16a34a;
-  --surface:      #ffffff;
-  --surface-sunk: #f3f4f6;
-  --text:         #1f2937;
-}
+1. **A prefix collision, or a near miss in review.** The convention has no enforcement,
+   so the first time it fails is the day it stops being sufficient.
+2. **Page stylesheets past ~1000 lines each.** `landing.css` is already at 1054.
 
-.submit-btn        { background-color: var(--brand); }
-.submit-btn:hover  { background-color: var(--brand-hover); }
-.forgot-password   { color: var(--brand); }
-.input-field       { background-color: var(--surface-sunk); color: var(--text); }
-```
+The migration path, in increasing order of disruption:
 
-Dark mode then becomes an override block rather than a rewrite:
+- **Keep global CSS, add a lint rule.** `stylelint` with `selector-class-pattern` can
+  enforce the prefix per file mechanically. Cheapest by far, and it turns the
+  convention into a real constraint. This is the recommended next step.
+- **CSS Modules** (`*.module.css`). Vite supports them with zero configuration.
+  Collisions become structurally impossible; the cost is unreadable generated class
+  names in devtools. Tokens in `:root` are unaffected — they are plain custom
+  properties and keep working exactly as they do now.
+- **A utility framework.** Would replace the token system rather than complement it.
+  Not recommended here: the token vocabulary *is* the design system, and it is the
+  part of this codebase most worth keeping.
 
-```css
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface:      #1f2937;
-    --surface-sunk: #111827;
-    --text:         #f3f4f6;
-  }
-}
-```
+---
 
-Custom properties are inherited and resolved at runtime, so a `:root` change repaints
-everything. Note the SVG colours in `login.jsx` would still need doing separately —
-`fill="currentColor"` or `fill="var(--brand-accent)"` on those paths.
+## Related documents
 
-### Option B — CSS Modules
-
-Fixes §8.3, the global namespace, and is supported by Vite out of the box: rename the
-file to `*.module.css` and it is scoped automatically. No plugin, no config.
-
-**Before** — `login.css`, global, literal class names
-
-```css
-/* login.css */
-.submit-btn { background-color: #22c55e; }
-```
-
-```jsx
-// login.jsx
-import './login.css';
-<button className="submit-btn">Sign in</button>
-```
-
-**After** — `login.module.css`, scoped, hashed class names
-
-```css
-/* login.module.css */
-.submitBtn { background-color: #22c55e; }
-```
-
-```jsx
-// login.jsx
-import styles from './login.module.css';
-<button className={styles.submitBtn}>Sign in</button>
-```
-
-Vite compiles `.submitBtn` to something like `_submitBtn_1a2b3_7`, so a `.submitBtn`
-in `register.module.css` is a *different* class and cannot collide. Two consequences
-to plan for:
-
-- **Class names become camelCase**, because `styles.submit-btn` is not valid
-  JavaScript. (`styles['submit-btn']` works but is ugly.)
-- **The `*` and `body` rules must move out** — a module is the wrong home for
-  app-wide resets. They belong in a real global file imported once from `main.jsx`,
-  e.g. `frontend/src/styles/global.css`. That is the right move regardless of which
-  option you pick.
-
-The two options are complementary, not alternatives: tokens on `:root` in the global
-file, scoped component styles in modules that consume them.
+| Document | Covers |
+| --- | --- |
+| `CLAUDE.md` (repo root) | The frontend conventions, stated as decided rules |
+| [`04-frontend.md`](04-frontend.md) | The components these styles dress, and the cascade contract in §4 |
+| [`08-gaps-and-findings.md`](08-gaps-and-findings.md) | Open/closed findings, including the a11y items above |
+| [`09-stack-correction-2026-09-05.md`](09-stack-correction-2026-09-05.md) | The migration record |

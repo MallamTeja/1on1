@@ -155,6 +155,31 @@ Pin this. It is the whole thing in twelve lines.
 
 ---
 
+## Also in this folder — engineering fundamentals
+
+The four disciplines above are about *driving the agent*. These are about the thing
+being built. Same house style: taught against this repo's real design, not a toy
+schema.
+
+| # | Document | Core question it answers |
+|---|---|---|
+| 06 | [Database Indexing](06-database-indexing.md) | *Why is this query slow, and what exactly do I create to fix it?* |
+
+> **06 — one sentence:** an index is a second copy of some of your data kept
+> permanently sorted, maintained on every write — so every index is a read you made
+> fast and a write you made slower.
+
+It is written now, before `backend/` has a data layer, which is the right time: §14 is
+the index plan for the first migration, and §9 solves the booking race condition that
+[`../03-system-design.md`](../03-system-design.md) raises in §11 but leaves unresolved.
+
+The database question it was written to inform is now **closed — RDS PostgreSQL,
+decided 2026-09-06**, so §1–§12 and §14 are unconditionally live. §13's comparison
+against DocumentDB and DynamoDB stays as teaching material, since the reasoning for
+why Postgres suits a join-heavy social graph outlives this one decision.
+
+---
+
 ## Related
 
 - [`../code/00-index.md`](../code/00-index.md) — the documentation these techniques

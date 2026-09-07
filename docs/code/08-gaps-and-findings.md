@@ -5,7 +5,19 @@
 > so you can decide what to change. Where a fix is obvious, it is shown as a
 > suggestion in a fenced block, not applied.
 
-**Audit date:** 2026-09-04 · **Commit:** `f856a01` · **Branch:** `main`
+**Original audit:** 2026-09-04 · commit `f856a01` · branch `main`
+**Re-audited:** 2026-09-06 against the working tree, after the TypeScript port was
+mounted, the dead `.jsx` files were deleted, and the ESLint / `.gitignore` work landed.
+
+Findings are **not deleted when they close.** A gaps document with history tells you
+what a fix actually changed; one that quietly drops resolved items just looks like it
+was never broken. Each finding below carries a status:
+
+| Status | Meaning |
+|---|---|
+| ✅ **CLOSED** | Fixed. The note records what closed it. |
+| 🔓 **STILL OPEN** | Verified still present on 2026-09-06. |
+| ⤵️ **SUPERSEDED** | The code it described no longer exists, so the finding is moot rather than fixed. |
 
 ---
 
@@ -22,7 +34,20 @@
 
 ## 1. 🔴 Broken — things that fail right now
 
-### 1.1 `pnpm lint` cannot run — no ESLint config exists
+### 1.1 ✅ CLOSED — `pnpm lint` cannot run, no ESLint config exists
+
+> **Closed 2026-09-06.** `frontend/eslint.config.js` now exists — **ESLint 10 flat
+> config**, not the `.eslintrc.cjs` suggested below. That suggestion was correct for
+> the ESLint 8 pinned at audit time, but by 2026-09-06 `eslint@latest` is **10.10.0**
+> and both 8 and 9 are off support (9.39.5 is `maintenance`, and pnpm prints a
+> deprecation warning for it). Writing `.eslintrc` would have adopted a
+> two-generations-stale format on day one. The script is now
+> `eslint . --max-warnings 0` — `--ext` was removed in ESLint 9+, and flat config
+> does its own file discovery — and it passes clean across all 14 source files.
+> Composition and the one scoped rule relaxation are documented in
+> [`04-frontend.md` §5.4](04-frontend.md).
+>
+> *The original finding and its ESLint 8 suggestion are kept below as written.*
 
 `frontend/package.json` declares:
 
@@ -69,7 +94,10 @@ module.exports = {
 
 ---
 
-### 1.2 🔴 Dependabot is misconfigured and will never open a PR
+### 1.2 🔓 STILL OPEN — Dependabot is misconfigured and will never open a PR
+
+> **Re-verified 2026-09-06:** `.github/dependabot.yml:39` still reads
+> `package-ecosystem: ""` and `:46` still `directory: "/"`. Unchanged.
 
 [`.github/dependabot.yml`](../../.github/dependabot.yml) contains:
 
@@ -90,7 +118,12 @@ Full corrected config is in [`07-ci-and-security.md`](07-ci-and-security.md).
 
 ---
 
-### 1.3 🟡 No `.env` file exists, and nothing tells you that
+### 1.3 🔓 STILL OPEN — No `.env` file exists, and nothing tells you that
+
+> **Re-verified 2026-09-06:** still no `.env` at the repo root, and still no
+> `.env.example`. The backend now also reads `JWT_ACCESS_SECRET`; with no `.env` it
+> generates a random one per process and warns that tokens are invalidated on every
+> restart. That raises this from cosmetic to genuinely confusing.
 
 Confirmed: no `.env` at the repo root. `.gitignore` correctly excludes it, so a
 fresh clone will never have one. Consequences:
@@ -99,7 +132,7 @@ fresh clone will never have one. Consequences:
   silently does nothing — dotenv does **not** throw on a missing file.
 - `process.env.PORT` is `undefined`, so the `|| 5000` fallback kicks in and the
   backend still starts. It works *by accident*, not by design.
-- The moment a real secret is added (Mongo URI, JWT secret, Gemini key), a fresh
+- The moment a real secret is added (the AWS database URI, JWT secret, Gemini key), a fresh
   clone breaks with a confusing runtime error rather than a clear one.
 
 **Suggested fix:** commit a `.env.example` (see [`02-root-config.md`](02-root-config.md))
@@ -117,7 +150,12 @@ for (const k of required) {
 
 ## 2. 🟠 Bugs — code that runs but is wrong
 
-### 2.1 The Google logo renders entirely in red
+### 2.1 ⤵️ SUPERSEDED — The Google logo renders entirely in red
+
+> **Superseded 2026-09-06.** `frontend/src/pages/login.jsx` was deleted. The Google
+> mark now comes from `IconGoogle` in `frontend/src/components/Icons.tsx`, a
+> different implementation — so this finding does not apply to it, and was never
+> fixed in the old file. *Kept for history.*
 
 [frontend/src/pages/login.jsx:146-151](../../frontend/src/pages/login.jsx#L146-L151) —
 all **four** `<path>` elements of the Google mark are `fill="#EA4335"`:
@@ -135,7 +173,13 @@ right. **Not fixed** — the correct hexes are noted inline in the source commen
 
 ---
 
-### 2.2 `Illustration` is defined inside `Login` — subtree remounts on every render
+### 2.2 ⤵️ SUPERSEDED — `Illustration` defined inside `Login`, subtree remounts
+
+> **Superseded 2026-09-06.** The file that held it was deleted. The pattern is still
+> worth knowing — a component defined inside another gets a new identity every
+> render, so React unmounts and remounts the whole subtree — which is why the
+> explanation is kept. `eslint-plugin-react-hooks` v7's `static-components` rule now
+> catches this class automatically. *Kept for history.*
 
 [frontend/src/pages/login.jsx:11](../../frontend/src/pages/login.jsx#L11):
 
@@ -164,7 +208,10 @@ export default function Login() { /* … */ }
 
 ---
 
-### 2.3 🟡 The Vite proxy target ignores `PORT`
+### 2.3 🔓 STILL OPEN — The Vite proxy target ignores `PORT`
+
+> **Re-verified 2026-09-06:** `frontend/vite.config.js:118` still hardcodes
+> `http://localhost:5000`. The suggested `loadEnv` fix below is still the right one.
 
 [frontend/vite.config.js](../../frontend/vite.config.js) hardcodes:
 
@@ -199,7 +246,16 @@ export default defineConfig(({ mode }) => {
 
 ## 3. 🔵 Gaps — not built yet
 
-### 3.1 The login form sends nothing, anywhere
+### 3.1 ✅ CLOSED — The login form sends nothing, anywhere
+
+> **Closed 2026-09-06.** `frontend/src/pages/Login.tsx` and `Register.tsx` have
+> controlled inputs, per-field validation via `src/lib/validate.ts`, touched/error
+> state, a `pending` submit lock, and real calls through `src/lib/api.ts` to
+> `POST /api/auth/{login,register}` followed by `refreshSession()`.
+> **The server does not answer them yet** — see 3.4 — so submissions take the
+> `NetworkError` path by design, which is what keeps the UI walkable.
+>
+> *The original table below describes the deleted `login.jsx` mock.*
 
 This is the largest gap in the frontend. In
 [login.jsx](../../frontend/src/pages/login.jsx):
@@ -215,7 +271,11 @@ This is the largest gap in the frontend. In
 
 The screen is a **visual mock**. Clicking "Sign in" is a no-op.
 
-### 3.2 Two empty page files
+### 3.2 ✅ CLOSED — Two empty page files
+
+> **Closed 2026-09-06.** Both 0-byte files were deleted, along with `login.jsx`,
+> `login.css`, `main.jsx` and `app.jsx`. Real `Landing.tsx` and `Register.tsx` pages
+> replaced them, each on its own route.
 
 ```console
 frontend/src/pages/landingpage.jsx   0 bytes
@@ -228,13 +288,38 @@ imports them today, so they are inert. Note that **register is already handled**
 by `login.jsx`'s `isLogin === false` branch, so `register.jsx` may be redundant
 by design rather than unfinished.
 
-### 3.3 No router
+### 3.3 ✅ CLOSED — No router
 
 [app.jsx](../../frontend/app.jsx) renders `<Login />` unconditionally. With
 `landingpage.jsx` waiting to be filled in there is no way to navigate anywhere.
-`react-router-dom` is not in `frontend/package.json`.
 
-### 3.4 The backend has one route and no architecture
+**Update 2026-09-05:** `react-router-dom@^7.9.1` **is** now in
+`frontend/package.json`, and `Landing.tsx` / `Login.tsx` / `Register.tsx` exist.
+The routing is still not wired, though: `frontend/index.html` continues to load
+`/main.jsx`, so `app.jsx` remains the live root and no `<BrowserRouter>` is
+mounted. The dependency is there; the wiring is not.
+
+> **Closed 2026-09-06.** The wiring landed. `frontend/index.html` now loads
+> `/src/main.tsx`, which renders `StrictMode > BrowserRouter > AuthProvider > App`.
+> `src/App.tsx` routes `/`, `/login`, `/register` and a `*` catch-all that redirects
+> home. `app.jsx` and `main.jsx` were deleted. Verified: all three routes return 200
+> from the dev server, and the production build succeeds.
+
+### 3.4 🔓 STILL OPEN (in progress) — The backend has one route and no architecture
+
+> **Re-verified 2026-09-06, and changing under active development.**
+> `backend/src/server.js` still registers exactly one reachable route,
+> `GET /api/health`. New files have appeared — `routes/auth.js`,
+> `routes/googleAuth.js`, `lib/{tokens,passwords,session,validation,httpError}.js`,
+> `middleware/{requireAuth,errorHandler}.js`, `repositories/userRepository.js` — and
+> `server.js` imports `authRouter`, `googleAuthRouter` and the error handlers, but
+> **does not yet mount any of them**, so none of those routes is reachable. At the
+> moment of this audit the module also failed to import
+> (`fileURLToPath is not defined`), i.e. the backend would not start.
+>
+> This is a snapshot of a tree being written concurrently, not a defect report — it
+> may well be resolved by the time you read it. It is recorded only so nobody reads
+> [`04-frontend.md` §7](04-frontend.md) and assumes the auth endpoints answer.
 
 [server.js](../../backend/src/server.js) is 23 lines. Missing, in the order you
 will need them:
@@ -269,11 +354,42 @@ All in [login.jsx](../../frontend/src/pages/login.jsx) and
 | A6 | Decorative SVG not hidden | login.jsx `Illustration` | Should carry `aria-hidden="true"` so assistive tech skips it. |
 | A7 | No `prefers-reduced-motion` guard | login.css transitions | Minor here (0.2s), matters once real animation lands. |
 
+### Re-audit 2026-09-06
+
+Every row above pointed at `login.jsx` / `login.css`, which were deleted. Re-checked
+against the current `frontend/src/`:
+
+| # | Status | Now |
+|---|---|---|
+| A1 | ✅ **CLOSED** (narrow residual) | **Corrected 2026-09-06 — this row previously said STILL OPEN, which was wrong.** `index.css:134` ships a global `:focus-visible { outline: 2px solid var(--spruce); outline-offset: 2px }`, and the one remaining `outline: none` (`:470`, on `.ui-field__input:focus`) immediately substitutes a visible `box-shadow: 0 0 0 3px var(--spruce-tint)` ring. Users do not lose the focus indicator, so the finding as written no longer holds. The narrow residual: `box-shadow` is discarded in `forced-colors` / Windows High Contrast mode while `outline` survives, so inputs lose their ring *there*. Tracked as [`05-styles.md` §8 row 2](05-styles.md). |
+| A2 | ✅ **CLOSED** | `components/TextField.tsx` pairs `htmlFor={id}` with the input's `id`, and adds `aria-invalid` plus `aria-describedby` wired to either the hint or the error message. Both auth forms use it, so every field is labelled. |
+| A3 | ⤵️ **SUPERSEDED** | There is no password-visibility toggle in the ported UI. |
+| A4 | ✅ **CLOSED** | The Google button in `components/AuthShell.tsx` renders visible text — "Continue with Google" — beside its icon, so it has an accessible name from its content. No `aria-label` needed. |
+| A5 | 🔓 **STILL OPEN** | The dead link survived the port: `pages/Login.tsx` renders `<a href="#reset">Forgot it?</a>` as a placeholder, with a `TODO` for a real `/forgot-password` route. |
+| A6 | 🔓 **STILL OPEN** | `components/Brand.tsx` correctly marks its mark `aria-hidden="true"` + `focusable="false"`, and 3 icons in `Icons.tsx` do the same — but that file exports ~28. Every icon here is decorative, so they should all be hidden from assistive tech. |
+| A7 | ✅ **CLOSED** | **Corrected 2026-09-06 — this row previously said STILL OPEN, which was wrong.** `index.css:557` ships the standard universal guard: `@media (prefers-reduced-motion: reduce)` clamping `animation-duration`, `animation-iteration-count` and `transition-duration` to `0.01ms !important` across `*, *::before, *::after`. Because it is universal it covers the page stylesheets too, which is why they correctly do not repeat it. |
+
+**Net: 4 closed, 1 superseded, 2 still open** (A5 the placeholder link, A6 the
+unmarked icons).
+
+> **Correction, same day.** A1 and A7 were first recorded as STILL OPEN in this
+> pass and are now CLOSED. Both were wrong for the same reason: the a11y sweep
+> searched the *component* files for the fixes and did not read `index.css`, where
+> both actually live — the `:focus-visible` ring at `:134` and the reduced-motion
+> guard at `:557`. The lesson is specific: in a system where one file holds the
+> reset and the shared primitives, "absent from the components" is not the same
+> claim as "absent". Each corrected row states what it previously said, so the
+> wrong call stays visible rather than being quietly overwritten.
+
 ---
 
 ## 5. 🟡 Structural / convention findings
 
-### 5.1 Entry files sit outside `src/`
+### 5.1 ✅ CLOSED — Entry files sit outside `src/`
+
+> **Closed 2026-09-06.** `main.jsx` and `app.jsx` were deleted; their replacements
+> are `src/main.tsx` and `src/App.tsx`. Everything now lives under `src/`, which is
+> the conventional Vite layout this finding asked for.
 
 ```text
 frontend/
@@ -297,7 +413,17 @@ frontend/
 
 Cosmetic today, annoying at 50 files.
 
-### 5.2 CSS is global, not scoped
+### 5.2 ⤵️ SUPERSEDED — CSS is global, not scoped
+
+> **Superseded 2026-09-06.** `login.css` — with its bare `*` and `body` rules and
+> generic class names — was deleted. The CSS is still deliberately **global rather
+> than CSS Modules**, but it is no longer unscoped: each stylesheet owns a prefix
+> (`ui-` shared primitives, `.ld-` landing, `.au-` auth shell), and all ~34 design
+> tokens live in one `:root` block in `src/index.css` with the page stylesheets
+> defining **zero**. Collisions are prevented by naming convention rather than by
+> tooling. The one real constraint that creates is documented in
+> [`04-frontend.md` §4.2](04-frontend.md): `index.css` must be imported before any
+> page CSS, because equal specificity makes source order decide the winner.
 
 `import './login.css'` makes Vite inject it as a plain `<style>` tag. The rules
 `*` and `body` therefore apply **application-wide**, and generic class names
@@ -305,12 +431,20 @@ Cosmetic today, annoying at 50 files.
 page that imports its own CSS will collide. See [`05-styles.md`](05-styles.md) for
 the CSS Modules / custom-properties migration path.
 
-### 5.3 `main: "index.js"` in the root package.json points at nothing
+### 5.3 🔓 STILL OPEN — `main: "index.js"` in the root package.json points at nothing
+
+> **Re-verified 2026-09-06:** `package.json:5` still declares it; there is still no
+> `index.js`. Harmless, still boilerplate.
 
 There is no `index.js` at the repo root. Harmless — the root package is only ever
 a script runner, never imported — but it is leftover `npm init` boilerplate.
 
-### 5.4 README is 5 bytes and does not render
+### 5.4 🔓 STILL OPEN — README is 5 bytes and does not render
+
+> **Re-verified 2026-09-06:** still 5 bytes, still `#1on1` with no space after the
+> `#`. The repo root now has a `CLAUDE.md` project guide which covers some of the
+> same ground, but it is written for Claude sessions, not for a human landing on the
+> GitHub page.
 
 ```markdown
 #1on1
@@ -319,13 +453,39 @@ a script runner, never imported — but it is leftover `npm init` boilerplate.
 No space after `#`, so GitHub-flavored markdown renders this as literal text, not
 an `<h1>`. A README skeleton is proposed in [`02-root-config.md`](02-root-config.md).
 
-### 5.5 `cors()` is currently redundant in dev
+### 5.5 🔓 STILL OPEN — and now more serious than "redundant"
+
+> **Re-verified 2026-09-06:** `backend/src/server.js:214` still calls bare
+> `app.use(cors())`. This is no longer merely redundant. Every request from
+> `src/lib/api.ts` sends `credentials: "include"` so the HTTP-only refresh cookie
+> rides along, and browsers **reject** `Access-Control-Allow-Origin: *` outright for
+> credentialed requests. The dev proxy hides this by making everything same-origin;
+> it breaks the moment the API is served from another origin. The fix is an explicit
+> origin plus `credentials: true`.
 
 The Vite proxy means the browser only ever talks to `localhost:3000` — it is a
 same-origin request, so CORS never engages. `app.use(cors())` matters for direct
 `:5000` calls and for a split-origin production deploy. Keeping it is correct;
 just know that in dev it is doing nothing, and that bare `cors()` means
 `Access-Control-Allow-Origin: *`, which must be narrowed before production.
+
+---
+
+### 5.6 ✅ CLOSED — build output was not gitignored
+
+> **Found and closed 2026-09-06.** Not in the original audit. The root `.gitignore`
+> was two lines — `node_modules` and `.env` — so `frontend/dist/` was untracked but
+> **not ignored**. Every production build dropped a 211 kB bundle into `git status`,
+> one careless `git add .` away from being committed. Committed build output is worse
+> than noise: hashed filenames change on every rebuild, so it generates phantom merge
+> conflicts indefinitely.
+>
+> The root `.gitignore` now also covers `dist/`, `build/`, `.vite/`, `*.tsbuildinfo`,
+> `.env.local`, `.env.*.local`, `*.log`, `.DS_Store`, `Thumbs.db` and `*.stackdump`.
+> Checked before writing it that **nothing matching those patterns was already
+> tracked** — an ignore rule does nothing to a file git already tracks, so that check
+> is what makes the fix real rather than cosmetic. Verified after: a build produces
+> `frontend/dist/` on disk and `git status` stays clean.
 
 ---
 
@@ -337,23 +497,42 @@ architecture. Here is the honest delta:
 | Declared in docs | In `package.json`? | In code? |
 |---|---|---|
 | React | ✅ `^18.2.0` | ✅ |
-| **TypeScript** | ❌ | ❌ — all files are `.js` / `.jsx`, and there is **no `tsconfig.json`** |
+| **TypeScript** | ✅ `typescript@^5.9.2` | ✅ **as of 2026-09-05** — `tsconfig.json` + `tsconfig.app.json` + `tsconfig.node.json` exist, and `src/pages/*.tsx`, `src/components/*.tsx`, `src/lib/*.ts` are TypeScript |
 | HTML / CSS | ✅ | ✅ |
 | anime.js | ❌ | ❌ |
 | D3.js | ❌ | ❌ |
 | Node.js + Express | ✅ `^4.18.2` | ✅ |
-| MongoDB Atlas + Mongoose | ❌ | ❌ |
+| AWS-hosted cloud database + its client | ❌ | ❌ |
 | Socket.IO | ❌ | ❌ |
 | WebRTC | ❌ | ❌ |
 | Gemini API / AI layer | ❌ | ❌ |
 | JWT auth | ❌ | ❌ |
 | Redis / RAG / job queue | ❌ (documented as "later") | ❌ |
 
-**The TypeScript one is worth calling out.** `frontend/package.json` installs
-`@types/react` and `@types/react-dom` — TypeScript type definitions — but there is
-no `tsconfig.json` and no `.tsx` file. Those packages currently do nothing except
-feed your editor's IntelliSense. That is a reasonable half-step, but be aware that
-**you are not type-checked today**, despite the docs saying the stack is TypeScript.
+**The TypeScript one used to be worth calling out.** `frontend/package.json` installed
+`@types/react` and `@types/react-dom` — TypeScript type definitions — but there was
+no `tsconfig.json` and no `.tsx` file, so those packages did nothing except feed your
+editor's IntelliSense and **you were not type-checked**, despite the docs saying the
+stack is TypeScript.
+
+**That gap closed on 2026-09-05.** `typescript@^5.9.2` and `react-router-dom@^7.9.1`
+are now real dependencies, the three `tsconfig*.json` files exist, `build` runs
+`tsc -b` before `vite build`, and `typecheck` is its own script. The Landing, Login and
+Register pages were ported to `frontend/src/pages/{Landing,Login,Register}.tsx` with
+supporting `frontend/src/components/` and `frontend/src/lib/`. The backend was **not**
+ported — it is still plain ESM JavaScript.
+
+> **✅ That TODO closed on 2026-09-06.** The entry point was switched
+> (`index.html` → `/src/main.tsx`), the router was wired, and all six dead files
+> — `main.jsx`, `app.jsx`, `src/pages/{landingpage,login,register}.jsx` and
+> `src/pages/login.css` — were deleted with Teja's approval. Before deleting, each
+> was shown to be part of a **closed island**: every reference to those six came from
+> inside the six themselves, so nothing live reached them.
+>
+> The frontend rows of the table above are now accurate as written. The remaining
+> ❌ rows — the database and its client, JWT auth, Socket.IO, WebRTC, Gemini —
+> are still genuinely absent, and the **JWT auth row is actively being worked on**
+> (see 3.4). No auth endpoint answers yet.
 
 This is not a defect. It is the normal distance between a design document and
 commit 5. It is written down here so nobody reads `docs/03-system-design.md` and
@@ -365,14 +544,26 @@ assumes any of it is running.
 
 Ranked by (breaks-things × cheapness-to-fix):
 
-1. **Fix `dependabot.yml`** — one word (`"npm"`). Turns broken automation back on. *2 min*
-2. **Add the ESLint config** — makes `pnpm lint` real, catches hook bugs automatically. *10 min*
-3. **Add `.env.example` + a real README** — the "can a new person clone this?" test. *20 min*
-4. **Wire the login form** — controlled inputs + a `fetch('/api/...')` call. This is the first line of code that makes the app an *application* rather than a mock. *1–2 h*
-5. **Hoist `Illustration`, fix the Google SVG colours, add the a11y attributes** — small, mechanical, done once. *30 min*
-6. **Make the proxy read `PORT`** — kills a future debugging session. *5 min*
-7. **Give the backend a shape** — `routes/`, `controllers/`, an error handler, a 404 handler — *before* the second route exists, not after the tenth. *2 h*
-8. **Decide on TypeScript** — do it before there are 50 files, or drop `@types/*` and be honestly JavaScript. Half-states get expensive.
+Items 2, 4, 5 (partly) and 8 from the original list are **done**. What remains,
+re-ranked by (breaks-things × cheapness-to-fix) as of 2026-09-06:
+
+1. **Fix `dependabot.yml`** — one word (`"npm"`), plus entries for `frontend/` and
+   `backend/`. Turns broken automation back on. *5 min*
+2. **Add `.env.example` + a real README** — the "can a new person clone this?" test,
+   and now also the answer to the `JWT_ACCESS_SECRET` warning on every backend boot.
+   *20 min*
+3. **Make the proxy read `PORT`** — kills a future debugging session. *5 min*
+4. **Narrow `cors()` to an explicit origin with `credentials: true`** — required
+   before any split-origin deploy, because `*` is rejected for credentialed
+   requests. *10 min*
+5. **Finish mounting the backend auth routers** — in progress; see 3.4.
+6. **Add a test runner and test `validate.ts` first** — it is pure, total, and has
+   zero coverage. The cheapest possible first suite. *1 h*
+7. **Finish the a11y pass** — A1, A5, A6, A7 above. Small and mechanical. *30 min*
+8. **Add an `ErrorBoundary`** — today a render throw in any page blanks the whole
+   app. *20 min*
+
+*(Original list preserved in git history; the numbering above replaces it.)*
 
 ---
 
@@ -392,6 +583,19 @@ Worth stating, because an audit that only lists problems is misleading:
   wrong; this repo got it right.
 - **The docs exist and are substantial** (2,574 lines). Writing the design before the
   code is the correct order.
+
+Added 2026-09-06:
+
+- **`strict: true` in `tsconfig.app.json`**, plus `noUnusedLocals` and
+  `noUnusedParameters` — turned on at the start of the TypeScript port rather than
+  bolted on at file 50, which is when it becomes expensive.
+- **Solution-style `tsconfig`** with separate app/node projects, so build tooling and
+  browser code never share a `lib`/`types` surface.
+- **One token vocabulary.** All ~34 design tokens in a single `:root`; page
+  stylesheets define zero. That is a discipline most projects lose by the third
+  screen.
+- **The access token is memory-only, never `localStorage`.** The XSS-safe choice, and
+  it was made before any endpoint existed to return one.
 
 The scaffolding decisions are better than the average project at this stage. The gap
 is purely that the application logic has not been written yet.

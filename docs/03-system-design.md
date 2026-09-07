@@ -17,7 +17,7 @@
                                 |
              +------------------+------------------+
              |                  |                  |
-         MongoDB Atlas       Gemini API        Auth/JWT
+          AWS Cloud DB       Gemini API        Auth/JWT
              |                  |
              |              AI Services
              |                  |
@@ -30,6 +30,23 @@
        Primary Application Data
 ```
 
+> **RESOLVED 2026-09-06.** "AWS Cloud DB" throughout this document means
+> **Amazon RDS for PostgreSQL** (`ap-south-1`), chosen by Teja on 2026-09-06
+> because the data is join-heavy and because `1on1_sb` already proved a Postgres
+> schema for this exact product. The canonical record of that decision and its
+> reasoning is `docs/02-technology-stack.md` §1. Nothing here is Java or Spring
+> Boot; the whole backend is Node.js + Express.
+>
+> **It is not provisioned yet** — the account contained zero databases as of the
+> 2026-09-06 audit (`docs/deployment/10-aws-inventory-2026-09-06.md`).
+>
+> Where the flows below still say "collection" (e.g. §7's Follow flow), that is
+> leftover MongoDB vocabulary from before the migration. Read it as "table". The
+> real relational shape — tables, keys, constraints and indexes — has now been
+> derived and lives in **`docs/architecture/01-data-model.md`**, which is the
+> schema's single source of truth. In particular, the race condition in §11 below
+> is solved there by a Postgres exclusion constraint, not by application locking.
+
 ------------------------------------------------------------------------
 
 ## 2. System Boundaries
@@ -40,7 +57,7 @@ The system consists of:
 2.  REST API
 3.  Realtime gateway
 4.  WebRTC signaling
-5.  MongoDB data layer
+5.  Cloud database data layer
 6.  Authentication service
 7.  AI service
 8.  AI agent/tool layer
@@ -104,7 +121,7 @@ Validate
  ↓
 Hash password
  ↓
-MongoDB
+AWS Cloud DB
  ↓
 Email verification
 ```
@@ -218,7 +235,7 @@ Search query
  ↓
 Express
  ↓
-MongoDB query / Atlas Search
+Database query / search index
  ↓
 Filters
  ↓
@@ -248,7 +265,7 @@ Extract structured filters
  ↓
 Search tool
  ↓
-MongoDB
+AWS Cloud DB
  ↓
 Rank results
 ```
@@ -324,6 +341,29 @@ Confirm
 ```
 
 The backend is the source of truth.
+
+> **RESOLVED 2026-09-06 — the guarantee lives in the schema, not the service.**
+>
+> A read-then-write check in Express cannot be atomic: two concurrent requests
+> both see the slot free and both insert. The fix is a Postgres **exclusion
+> constraint**, which makes an overlapping accepted booking impossible to commit:
+>
+> ``` sql
+> ALTER TABLE session_booking
+>     ADD CONSTRAINT ex_booking_provider_no_overlap
+>     EXCLUDE USING gist (
+>         provider_id WITH =,
+>         tstzrange(scheduled_start_at, scheduled_end_at, '[)') WITH &&
+>     ) WHERE (status IN ('ACCEPTED','RESCHEDULED','IN_PROGRESS'));
+> ```
+>
+> Requires the `btree_gist` extension. The loser of the race gets a
+> `23P01 exclusion_violation`, which the API maps to **409 Conflict**. A unique
+> index alone is *not* sufficient — it only catches identical start times, not
+> overlapping ranges (19:00–20:00 vs 19:30–20:30).
+>
+> Full reasoning, the second protection level, and why advisory locks and
+> `SERIALIZABLE` were rejected: `docs/architecture/01-data-model.md` §7.1.
 
 ------------------------------------------------------------------------
 
@@ -468,7 +508,7 @@ Socket.IO
  ↓
 Express/service validation
  ↓
-MongoDB persistence
+AWS Cloud DB persistence
  ↓
 Socket.IO emit
  ↓
@@ -534,7 +574,7 @@ Gemini
  ↓
 Structured output
  ↓
-MongoDB
+AWS Cloud DB
  ↓
 Meeting recap UI
 ```
@@ -581,7 +621,7 @@ topics[]
                          |
                     Authorization
                          |
-                      MongoDB
+                   AWS Cloud DB
 ```
 
 The model reasons about which tool to call.
@@ -719,7 +759,7 @@ Event
  ↓
 Express service
  ↓
-MongoDB notification
+AWS Cloud DB notification
  ↓
 Socket.IO emit
  ↓
@@ -846,7 +886,7 @@ Only appropriate cryptographic proof should be anchored.
                        |
           +------------+-------------+
           |                          |
-     MongoDB Atlas              Gemini API
+     AWS Cloud DB               Gemini API
           |
        Future Redis
           |
@@ -872,7 +912,7 @@ Later:
 
 The application should use environment variables for:
 
--   MongoDB URI
+-   Database connection URI for RDS PostgreSQL (`DATABASE_URL`)
 -   JWT secrets
 -   Google OAuth credentials
 -   Gemini API key
@@ -918,7 +958,7 @@ Services
  ↓
 Models
  ↓
-MongoDB
+AWS Cloud DB
 ```
 
 AI:
@@ -970,7 +1010,7 @@ with duplicated cancellation logic.
 
 -   React + TypeScript
 -   Node.js + Express
--   MongoDB Atlas
+-   RDS PostgreSQL (not provisioned yet)
 -   JWT
 -   Email/password
 -   Google OAuth

@@ -1,0 +1,310 @@
+/* ==========================================================================
+   Shared shell for Login and Register. Namespaced .au-.
+   ========================================================================== */
+
+.au {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--ground);
+}
+
+/* ---- Left panel --------------------------------------------------------- */
+
+.au-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding: 40px 48px 44px;
+  background: var(--spruce-deep);
+  color: var(--on-dark);
+  /* A faint gridline field — the calendar showing through the panel. */
+  background-image: linear-gradient(
+      to right,
+      rgba(143, 211, 193, 0.07) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(143, 211, 193, 0.07) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.au-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: auto;
+  max-width: 42ch;
+}
+
+.au-panel__title {
+  font-size: 2rem;
+  font-weight: 700;
+  font-stretch: 116%;
+  color: #fff;
+}
+
+.au-panel__lede {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--on-dark-2);
+}
+
+.au-panel__label {
+  color: var(--spruce-glow);
+}
+
+.au-panel__fine {
+  max-width: 40ch;
+  line-height: 1.7;
+  color: var(--on-dark-2);
+}
+
+.au-panel__slots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* A compact numbered list of the loop, used on the register panel. */
+.au-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.au-steps li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(143, 211, 193, 0.16);
+}
+
+.au-steps li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.au-steps__n {
+  font-family: var(--mono);
+  font-size: var(--step-small);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--spruce-glow);
+}
+
+.au-steps__verb {
+  font-size: var(--step-body);
+  font-weight: 600;
+  color: var(--on-dark);
+}
+
+.au-steps__body {
+  grid-column: 2;
+  font-size: var(--step-small);
+  line-height: 1.6;
+  color: var(--on-dark-2);
+}
+
+/* ---- Right side: the form ---------------------------------------------- */
+
+.au-main {
+  display: grid;
+  place-items: center;
+  padding: 48px 32px;
+  background: var(--surface);
+}
+
+.au-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 402px;
+}
+
+.au-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 40px;
+  font-size: var(--step-small);
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.au-back:hover {
+  color: var(--spruce);
+}
+
+.au-head {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-bottom: 30px;
+}
+
+.au-title {
+  font-size: 2.15rem;
+  font-weight: 700;
+  font-stretch: 116%;
+}
+
+.au-sub {
+  font-size: var(--step-body);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.au-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.au-forgot {
+  font-family: var(--mono);
+  font-size: var(--step-label);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--spruce);
+}
+
+.au-submit {
+  margin-top: 6px;
+}
+
+.au-submit:disabled {
+  background: var(--ink-3);
+  cursor: progress;
+}
+
+.au-error {
+  padding: 11px 14px;
+  border: 1px solid color-mix(in oklab, var(--brick) 32%, var(--line));
+  border-left: 3px solid var(--brick);
+  border-radius: var(--r-sm);
+  background: var(--brick-tint);
+  font-size: var(--step-small);
+  font-weight: 500;
+  color: var(--brick);
+}
+
+.au-or {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 26px 0;
+}
+
+.au-or::before,
+.au-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.au-google {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: var(--step-body);
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.au-google:hover {
+  border-color: var(--ink-3);
+  background: var(--surface-2);
+}
+
+.au-foot {
+  margin-top: 30px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--step-small);
+  color: var(--ink-2);
+}
+
+.au-foot a {
+  font-weight: 600;
+}
+
+/* Tablet and below: one column, and the FORM comes first. Nobody arriving at
+   /login wants to scroll past a marketing panel to reach the password box. */
+@media (max-width: 900px) {
+  .au {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .au-main {
+    order: -1;
+    padding: 36px 24px 48px;
+  }
+
+  .au-card {
+    max-width: 460px;
+  }
+
+  .au-panel {
+    gap: 24px;
+    padding: 32px 24px 36px;
+  }
+
+  .au-panel__body {
+    margin-top: 0;
+  }
+
+  .au-panel__title {
+    font-size: 1.5rem;
+  }
+
+  .au-back {
+    margin-bottom: 28px;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Grow the tap area without moving the label row it sits on. */
+  .au-forgot {
+    padding: 10px 0;
+    margin: -10px 0;
+  }
+
+  .au-google {
+    min-height: 48px;
+  }
+
+  .au-submit {
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 520px) {
+  .au-main {
+    padding: 28px 20px 40px;
+  }
+
+  .au-panel {
+    padding: 26px 20px 30px;
+  }
+
+  .au-title {
+    font-size: 1.85rem;
+  }
+
+  .au-panel__title {
+    font-size: 1.35rem;
+  }
+}

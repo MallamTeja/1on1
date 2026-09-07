@@ -20,12 +20,14 @@
 import { defineConfig } from 'vite';
 
 // The official React plugin. It does two jobs:
-//   1. JSX TRANSFORM - hands .jsx files to esbuild/Babel so `<App />` compiles to a
+//   1. JSX TRANSFORM - hands .jsx/.tsx files to esbuild so `<App />` compiles to a
 //      `jsx(App)` call. Without this plugin Vite would not know how to parse the
-//      JSX in main.jsx, app.jsx or login.jsx at all, and every file would fail.
+//      JSX in src/main.tsx, src/App.tsx or the page components at all, and every
+//      file would fail.
 //   2. FAST REFRESH - hot-swaps an edited component in the running page while
-//      PRESERVING its useState values, so `isLogin` / `showPassword` survive a save
-//      instead of resetting on every keystroke of development.
+//      PRESERVING its useState values, so the half-typed email and the `touched`
+//      map in src/pages/Login.tsx survive a save instead of resetting on every
+//      keystroke of development.
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({

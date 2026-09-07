@@ -9,7 +9,7 @@ line is there, and what has to be built before it matches the architecture in
 ## 1. Purpose and current maturity
 
 The backend is the Node.js + Express HTTP server for **1on1**. In the target
-architecture it owns the REST API, JWT authentication, the MongoDB data layer,
+architecture it owns the REST API, JWT authentication, the AWS cloud data layer,
 the Socket.IO realtime gateway, WebRTC signaling relay, and the Gemini AI/agent
 layer. It is meant to be the single source of truth for every business rule — the
 UI and the AI agent are both supposed to call the *same* service functions.
@@ -21,7 +21,7 @@ job is to prove the toolchain works end to end:
 | --- | --- |
 | HTTP server | Present — Express, one process, one port |
 | Routes | **One**: `GET /api/health` |
-| Database | None. No MongoDB driver, no Mongoose, no connection string usage |
+| Database | None. No database driver, no connection string usage |
 | Authentication | None. No JWT, no password hashing, no sessions, no cookies |
 | Models / schemas | None |
 | Controllers / services | None — the single handler is inline in `server.js` |
@@ -505,7 +505,7 @@ hard-coded to `:5000` and would need updating too. If startup fails with
 ## 7. What is missing / next steps
 
 Measured against [`docs/03-system-design.md`](../03-system-design.md), which
-specifies MongoDB Atlas + Mongoose, JWT auth with HTTP-only cookies, Google
+specifies an AWS-hosted cloud database, JWT auth with HTTP-only cookies, Google
 OAuth, Socket.IO rooms, WebRTC signaling, and a Gemini AI/agent layer, the gaps
 are structural rather than cosmetic.
 
@@ -516,10 +516,10 @@ are structural rather than cosmetic.
 | **Router layer** | Every route is registered inline in `server.js`. That file becomes unmaintainable at ~5 routes. Needs `express.Router()` per feature, mounted as `app.use('/api/users', userRoutes)`. | §34 "Backend Layering": Routes → Controllers → Services → Models |
 | **Controllers** | Nothing separates HTTP concerns (parsing `req`, shaping `res`) from business logic, so logic cannot be reused. | §34 |
 | **Services** | The AI agent and the UI are both required to call the *same* `cancelSession()`. With logic inline in handlers that is impossible. | §35 "one source of truth for business rules" — explicitly forbids a duplicated `cancelSessionFromAI()` |
-| **Models** | No Mongoose schemas, no DB connection, no `MONGODB_URI` read. Nothing is persisted; the server is stateless. | §2, §31 (MongoDB Atlas as the primary data layer) |
+| **Models** | No schemas, no DB connection, no database URI read. Nothing is persisted; the server is stateless. | §2, §31 (the AWS-hosted cloud database as the primary data layer) |
 | **Auth middleware** | No JWT verification, no `req.user`, no password hashing, no refresh-token rotation, no route protection. Every endpoint is public. | §4 Authentication Flow, §33 Security |
 | **Centralized error handler** | Only Express's default handler exists, which leaks stack traces in dev and returns HTML. Needs the 4-arg `(err, req, res, next)` middleware registered last, plus an `AppError` class and an async-handler wrapper (an ESM/Express 4 handler that rejects will otherwise hang the request). | Implied by §33 |
-| **Request validation** | Nothing checks `req.body`. Unvalidated input reaching Mongo is both a correctness and a security problem. Needs Zod/Joi/`express-validator` at the route boundary. | §33 "Input validation" |
+| **Request validation** | Nothing checks `req.body`. Unvalidated input reaching the database is both a correctness and a security problem. Needs Zod/Joi/`express-validator` at the route boundary. | §33 "Input validation" |
 | **Logging** | One `console.log`. No request logging, no levels, no request IDs, no structured output — undebuggable once deployed. Needs `morgan` and/or `pino`. | §33 "Audit logs for important agent actions" |
 | **Graceful shutdown** | No `SIGTERM`/`SIGINT` handler, no `server.close()`, no DB disconnect. On deploy the process is killed mid-request. Also no `EADDRINUSE` handling and no `unhandledRejection` guard. | Implied by §32 (Render, then GCP) |
 | **Tests** | No test runner, no test script, not one test. | — |
@@ -544,12 +544,17 @@ are structural rather than cosmetic.
 1. Restructure into `routes/ → controllers/ → services/`, keeping `/api/health`
    as the first thing to move.
 2. Add centralized error handling + an async wrapper, then request validation.
-3. Connect MongoDB via Mongoose; add `config/db.js` and the `User` model.
+3. Connect the AWS-hosted cloud database; add `config/db.js` and the `User` model.
 4. Build auth: signup, login, password hashing, JWT access + refresh, auth
    middleware; lock down CORS with `credentials: true` at the same time.
 5. Add logging and graceful shutdown before the first deploy.
 6. Layer on Socket.IO, then WebRTC signaling, then the AI/agent layer — the
    agent reusing the services from step 1, never reimplementing them.
+
+> **TODO:** step 3 is blocked on confirming the exact AWS database service
+> (RDS / Aurora / DynamoDB / DocumentDB). The driver, `config/db.js` and the
+> shape of the `User` model all follow from that choice — record it in
+> `docs/02-technology-stack.md` §1 first.
 
 ---
 

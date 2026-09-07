@@ -19,8 +19,38 @@
 
 ### Database
 
--   MongoDB Atlas
--   Mongoose
+-   **Amazon RDS for PostgreSQL** (managed, `ap-south-1`)
+
+> **DECIDED 2026-09-06 — this line is canonical.** Every other database mention
+> in the docs points back here.
+>
+> **The choice: RDS PostgreSQL.** Reasoning:
+>
+> -   The data is **join-heavy** — follows, session offerings, availability,
+>     bookings and payments are all relational, and the core queries traverse
+>     several tables at once. A document store would denormalise the same joins
+>     into application code.
+> -   The booking flow needs **transactional guarantees the schema itself can
+>     enforce**. Postgres exclusion constraints (`EXCLUDE USING gist`) make
+>     double-booking structurally impossible; see
+>     `docs/architecture/01-data-model.md` §7.1.
+> -   `1on1_sb` already **proved a Postgres schema for this exact product** —
+>     working Flyway migrations against a live database. The data model is
+>     ported from it (the Java is not).
+> -   DynamoDB was considered and rejected: cheaper at idle, but a poor fit for
+>     the relational queries this product is made of.
+>
+> **Not provisioned yet.** An AWS CLI audit on 2026-09-06 confirmed the account
+> holds *zero* databases of any kind across all 17 regions, and the backend has
+> no database driver. Until provisioning, persistence stays behind the
+> repository seam in `backend/src/repositories/`.
+>
+> -   Schema design → `docs/architecture/01-data-model.md`
+> -   Provisioning plan and cost → `docs/deployment/11-rds-provisioning-plan.md`
+> -   Account inventory → `docs/deployment/10-aws-inventory-2026-09-06.md`
+
+There is no MongoDB in this project. The stack is Node.js end to end — no Java,
+no Spring Boot, no JVM component of any kind.
 
 ### Realtime
 
@@ -66,12 +96,16 @@ Required:
 -   JavaScript concepts
 -   HTML
 -   CSS
--   MongoDB/Mongoose query concepts
+-   SQL and query concepts for RDS PostgreSQL
 
 The application does not require multiple backend programming languages.
 
 TypeScript should be preferred for both frontend and backend to reduce
 context switching and improve type safety.
+
+As of 2026-09-05 the frontend is being ported from plain `.jsx` to TypeScript
+(React + Vite + TypeScript), closing the long-standing gap between this document
+and the code on disk. The backend remains Node.js + Express (ESM).
 
 ------------------------------------------------------------------------
 
@@ -97,6 +131,26 @@ option if required, but email/password remains the core credential flow.
 
 Clerk is a future option and should not be introduced into the current
 implementation.
+
+The canonical auth endpoints are `POST /api/auth/register`,
+`POST /api/auth/login` and `POST /api/auth/refresh`. Authentication is
+implemented in Express with `bcrypt` hashing and `jsonwebtoken` — there is no
+Spring Security or any other non-Node auth stack in this project.
+
+**These are the intended contract, not shipped behaviour.** As of 2026-09-05 the
+backend implements exactly one route, `GET /api/health`. None of the auth
+endpoints exist yet. The frontend's `frontend/src/lib/api.ts` already calls them
+and degrades through its network-error path, which is deliberate — the UI landed
+first.
+
+Google OAuth stays optional and additive; it never replaces email + password.
+The frontend currently points it at `GET /api/auth/google`, an Express-shaped
+path chosen because the Spring convention `/oauth2/authorization/google` does
+not exist here and there is no Spring in this project.
+
+> **TODO:** `/api/auth/google` is a placeholder — `frontend/src/lib/api.ts`
+> carries the matching TODO. Settle the real Express OAuth route (and the
+> callback path) when the backend auth layer is actually built.
 
 ------------------------------------------------------------------------
 
@@ -174,7 +228,8 @@ Express provides REST APIs for:
 -   Achievements
 -   AI tools
 
-The frontend should not directly access MongoDB.
+The frontend should not directly access the database. All data access goes
+through the Express REST API.
 
 ------------------------------------------------------------------------
 
@@ -228,7 +283,7 @@ A message lifecycle:
 
 **Sent → Delivered → Seen**
 
-The actual message should be persisted in MongoDB.
+The actual message should be persisted in RDS PostgreSQL.
 
 Temporary realtime states such as typing indicators should not be
 persisted as normal messages.
@@ -243,6 +298,10 @@ Recommended collections:
 -   Conversation
 -   Message
 
+> **TODO:** "collections" here is MongoDB vocabulary that predates the AWS
+> migration — same caveat as §16. Read it as "two entities", and re-derive the
+> actual storage shape once the AWS database service is chosen.
+
 ------------------------------------------------------------------------
 
 ## 10. Online/Offline Presence
@@ -251,7 +310,7 @@ Socket.IO connection state provides initial presence.
 
 For a single backend instance:
 
-MongoDB may not be required for transient online status.
+The database may not be required for transient online status.
 
 Later, when multiple backend instances exist, Redis should manage shared
 presence.
@@ -362,7 +421,23 @@ GCP storage is a future deployment consideration.
 
 ------------------------------------------------------------------------
 
-## 16. MongoDB Data Model
+## 16. Data Model
+
+> **RESOLVED 2026-09-06 — see `docs/architecture/01-data-model.md`.**
+>
+> §16–§22 were written against MongoDB and are still phrased in document-database
+> terms ("collections", embedded documents). The database is now **RDS
+> PostgreSQL** (§1), and the real relational schema — tables, columns, keys,
+> constraints, indexes and the booking state machine — lives in
+> **`docs/architecture/01-data-model.md`**. That file is the schema's single
+> source of truth.
+>
+> These sections are **deliberately left as-is rather than rewritten**, so that
+> the schema is described in exactly one place. Restating table definitions here
+> would create a second copy that drifts out of date the first time a column
+> changes. Read §16–§22 as *product intent* — which entities exist and how they
+> relate — and the data-model doc as *the schema*. Where they disagree, the
+> data-model doc wins.
 
 Core collections:
 
@@ -560,7 +635,7 @@ Express validates authorization.
 
 The tool performs the action.
 
-MongoDB stores the result.
+The database stores the result.
 
 ------------------------------------------------------------------------
 
@@ -612,7 +687,7 @@ operations.
 
 Meeting pipeline:
 
-**Meeting → transcript → Gemini → structured JSON → MongoDB**
+**Meeting → transcript → Gemini → structured JSON → RDS PostgreSQL**
 
 Store:
 
@@ -677,7 +752,7 @@ Potential uses:
 -   AI task queues
 -   Temporary state
 
-MongoDB remains the primary database.
+RDS PostgreSQL remains the primary database.
 
 ------------------------------------------------------------------------
 
@@ -722,9 +797,13 @@ Later target:
 -   GCP application hosting
 -   GCP storage for recordings/assets
 -   Gemini API / Google Cloud integration
--   MongoDB Atlas remains an external managed database unless a future
-    architecture decision changes it
+-   RDS PostgreSQL remains an external managed database unless
+    a future architecture decision changes it
 -   Redis as managed/hosted infrastructure later
+
+> **TODO:** the database now lives on AWS while application hosting still targets
+> GCP. Confirm whether that cross-cloud split is intended before committing to
+> either, and record the exact AWS database service alongside it.
 
 Do not move to GCP prematurely just because it is the eventual hosting
 target.
@@ -820,8 +899,8 @@ Do not implement infrastructure before the product needs it.
 
 The stack should grow in this order:
 
-**MongoDB → Socket.IO/WebRTC → Gemini → Redis → RAG/memory → scalable
-media infrastructure**
+**RDS PostgreSQL → Socket.IO/WebRTC → Gemini → Redis → RAG/memory →
+scalable media infrastructure**
 
 This prevents the prototype from becoming an infrastructure project
 instead of a product.

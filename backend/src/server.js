@@ -26,17 +26,32 @@
  *   with no watcher.
  *
  * WHAT IT EXPOSES
- *   One HTTP endpoint:
- *       GET http://localhost:5000/api/health  ->  200 {"status":"ok", ...}
+ *       GET  /api/health                 200 {"status":"ok", ...}
+ *       POST /api/auth/register          201 AuthResponse   409 email taken
+ *       POST /api/auth/login             200 AuthResponse   401 bad credentials
+ *       POST /api/auth/refresh           200 AuthResponse   401 no/stale cookie
+ *       POST /api/auth/logout            204
+ *       GET  /api/auth/me                200 UserResponse   401 without a token
+ *       GET  /api/auth/google            302 -> accounts.google.com
+ *       GET  /api/auth/google/callback   302 -> the frontend, session cookie set
  *   The Vite dev server (frontend, port 3000) proxies any request beginning
  *   with /api to http://localhost:5000, so the browser can call "/api/health"
  *   on its own origin and still reach this server. See frontend/vite.config.js.
  *
  * WHAT IT DOES *NOT* DO YET
- *   No database, no authentication, no routers/controllers/models, no error
- *   handling, no logging, no graceful shutdown. This is a scaffold — the
- *   smallest server that proves the toolchain works end to end.
+ *   No real database — user records live in an in-memory Map that is wiped on
+ *   every restart, because the AWS database service is still an open decision
+ *   in docs/02-technology-stack.md. Everything persistence-related is funnelled
+ *   through src/repositories/userRepository.js so that swapping it out is one
+ *   file; read the header of that file before doing anything with it.
+ *   Also missing: structured logging, rate limiting, graceful shutdown.
  *   Full write-up: docs/code/03-backend.md
+ *
+ * WHAT IT GAINED (auth pass)
+ *   Email+password auth and Google sign-in now live in src/routes/*, mounted
+ *   below. This file stays a BOOTSTRAP — it wires things together and owns no
+ *   business logic of its own. The rule to keep: if you are about to write an
+ *   `if` in here, it belongs in a router or a middleware instead.
  * =============================================================================
  */
 
@@ -48,6 +63,14 @@
 // Node would treat this file as CommonJS and these lines would be a syntax
 // error. All imports are resolved and executed BEFORE any code below runs.
 
+// !! THIS IMPORT MUST STAY FIRST — DO NOT REORDER OR REMOVE IT !!
+// It has no bindings because it is imported purely for its side effect: it
+// reads the repo-root .env into process.env. ES module imports are HOISTED and
+// evaluated in source order before this file's own body runs, so any module
+// below that reads process.env at load time (./config/env.js does) would see an
+// empty environment if this ran later. The full explanation is in the file.
+import './config/loadEnv.js';
+
 // `express` is the web framework. The default export is a factory function:
 // calling express() returns a new application object. It is *not* a class — you
 // never write `new express()`.
@@ -58,83 +81,34 @@ import express from 'express';
 // a response from :5000 to JavaScript running on :3000.
 import cors from 'cors';
 
-// `dotenv` reads a plain-text .env file off disk and copies its KEY=value pairs
-// into `process.env`. It is how secrets (DB URIs, API keys, JWT secrets) reach
-// the code without ever being committed to git — note that `.env` is listed in
-// this repo's .gitignore.
-import dotenv from 'dotenv';
+// `cookie-parser` reads the incoming `Cookie:` header, splits and URL-decodes
+// it, and hands the result to handlers as `req.cookies`. Without it that header
+// is one raw string and `req.cookies` is undefined. The refresh token lives in
+// an HTTP-only cookie, so POST /api/auth/refresh depends entirely on this.
+import cookieParser from 'cookie-parser';
 
-// `path` is a Node built-in for manipulating filesystem paths in a way that is
-// correct on both Windows (backslashes, "C:\") and POSIX (forward slashes).
-// Never build paths with string concatenation; use path.join/path.resolve.
-import path from 'path';
-
-// `fileURLToPath` is a named export of the Node built-in `url` module. It
-// converts a file:// URL string into a real OS filesystem path. See the block
-// below for why that conversion is necessary at all.
-import { fileURLToPath } from 'url';
-
-// -----------------------------------------------------------------------------
-// RECREATING __filename AND __dirname (the ESM tax)
-// -----------------------------------------------------------------------------
-// In CommonJS (the old `require()` world) Node injected two magic variables into
-// every module: `__filename` (absolute path of this file) and `__dirname`
-// (absolute path of the folder containing it). ES modules are a *language*
-// standard, not a Node-specific one, so those Node-only globals DO NOT EXIST
-// here. Referencing __dirname directly would throw
-// "ReferenceError: __dirname is not defined in ES module scope".
-//
-// The standard replacement is `import.meta` — an object the module system fills
-// in per-module. `import.meta.url` is a STRING holding the absolute file:// URL
-// of the current module, e.g. on Windows:
-//     "file:///C:/Users/tejam/OneDrive/myproj/1on1/backend/src/server.js"
-//
-// That is a URL, not a path, and you cannot feed it to `fs` or `path` as-is:
-//   * it carries the "file://" scheme prefix,
-//   * spaces and non-ASCII characters are percent-encoded ("My%20Docs"),
-//   * on Windows it has a leading slash before the drive letter ("/C:/...")
-//     and uses forward slashes.
-// `fileURLToPath()` handles all three, decoding the escapes and producing a
-// genuine platform path: "C:\Users\tejam\...\backend\src\server.js".
-// (This repo lives under a OneDrive path, exactly the kind of location where an
-// encoded character or space shows up — so the conversion is not academic.)
-const __filename = fileURLToPath(import.meta.url);
-
-// `path.dirname()` strips the last segment off a path, turning the file path
-// above into the directory that contains it:
-//     "C:\Users\tejam\...\backend\src"
-// We want the DIRECTORY, not the file, because the relative path built below is
-// relative to "where this file lives" — which is stable no matter what folder
-// the user happened to be in when they typed `pnpm dev:backend`.
-// (A bare relative path like './.env' would instead resolve against
-// process.cwd(), the *caller's* directory, and would break the moment the
-// server is started from somewhere else.)
-const __dirname = path.dirname(__filename);
+// Our own modules. `config` is the validated, frozen view of process.env — this
+// file never reads process.env directly, so there is exactly one place where a
+// missing or malformed variable is caught (see ./config/env.js).
+import { config, describeConfig } from './config/env.js';
+import { authRouter } from './routes/auth.js';
+import { googleAuthRouter } from './routes/googleAuth.js';
+import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 // -----------------------------------------------------------------------------
 // CONFIGURATION
 // -----------------------------------------------------------------------------
 
-// Load environment variables. `dotenv.config()` defaults to looking for a .env
-// in the current working directory; we override that with an explicit `path`.
+// Environment variables are ALREADY LOADED by the time this line is reached:
+// ./config/loadEnv.js did it at the top of the import list, and ./config/env.js
+// has already validated them into the frozen `config` object imported above.
+// (The __filename/__dirname reconstruction and the dotenv.config() call that
+// used to live here moved into loadEnv.js — comments and all — because ES
+// module imports are hoisted above the module body, so doing it here ran too
+// late for any module that reads process.env when it loads.)
 //
-// Walking the path from __dirname (= backend/src):
-//     backend/src  --  ".."   -->  backend
-//     backend      --  ".."   -->  <repo root>
-//     <repo root>  --  ".env" -->  <repo root>/.env
-// So there is ONE .env file for the whole monorepo, sitting next to the root
-// package.json and pnpm-workspace.yaml — not one .env per package.
-//
-// This deliberately matches the frontend: frontend/vite.config.js sets
-// `envDir: '../'`, which tells Vite to read that same repo-root .env. Backend
-// and frontend therefore share a single source of configuration truth, which is
-// why a value like PORT only has to be written down once.
-//
-// Note this MUTATES the global `process.env` object as a side effect and returns
-// a result object we simply ignore. It must run BEFORE any code that reads
-// process.env — hence its position above the PORT line. If the file does not
-// exist dotenv does not throw; process.env is just left unchanged.
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+// Nothing below this point reads process.env directly. One validated source of
+// truth, and a boot-time failure instead of an undefined at 3am.
 
 // Create the application instance. Calling express() returns a special object
 // that is *also* a function with the signature (req, res) — that is, it IS a
@@ -157,7 +131,12 @@ const app = express();
 // and do arithmetic on it you must Number() it first, or "10" + 1 quietly
 // becomes "101". Likewise `process.env.DEBUG === 'true'` is the correct way to
 // read a boolean — the string "false" is itself truthy.
-const PORT = process.env.PORT || 5000;
+//
+// That trap is exactly why this now comes from `config` rather than being read
+// here: ./config/env.js does the Number() conversion once, rejects a PORT that
+// is not a positive integer at BOOT rather than letting app.listen() fail with
+// something cryptic, and applies the same `|| 5000` default in one place.
+const PORT = config.port;
 
 // -----------------------------------------------------------------------------
 // GLOBAL MIDDLEWARE
@@ -182,19 +161,49 @@ const PORT = process.env.PORT || 5000;
 //    request asking permission, and only sends the real request if the answer
 //    allows it. The cors package replies to those OPTIONS requests for you.
 //
-//    Called bare like this, `cors()` uses its wide-open defaults and sends
-//    `Access-Control-Allow-Origin: *` — any website on the internet may call
-//    this API from a user's browser. Convenient in development, UNACCEPTABLE in
-//    production: before shipping, replace it with an explicit allowlist, e.g.
-//        app.use(cors({ origin: process.env.FRONTEND_ORIGIN, credentials: true }))
-//    Note also that `*` and cookie-based auth are mutually exclusive — once JWT
-//    refresh tokens live in HTTP-only cookies, `credentials: true` plus a real
-//    origin becomes mandatory.
+//    This USED to be a bare `cors()`, which sends `Access-Control-Allow-Origin: *`
+//    and lets any website on the internet call this API from a user's browser.
+//    That had to change the moment auth landed, for a reason that is a hard
+//    browser rule rather than a preference:
+//
+//        A WILDCARD ORIGIN AND CREDENTIALS ARE MUTUALLY EXCLUSIVE.
+//
+//    Every call in frontend/src/lib/api.ts uses `credentials: "include"` so the
+//    refresh cookie rides along. A browser flatly refuses to hand back a
+//    credentialed response whose Allow-Origin is `*` — it fails the request and
+//    logs a CORS error. So `*` would not merely be insecure here, it would be
+//    broken. The allowlist below is what makes cookie auth work at all.
+//
+//    Passing a FUNCTION rather than an array is what makes the reflection
+//    correct: with credentials enabled the server must echo back one specific
+//    origin (never `*`), and this decides per request whether the caller's
+//    Origin is on the list.
 //
 //    (In local dev the browser often never even triggers CORS, because Vite's
 //    proxy makes the call look same-origin. This matters for any client that
 //    hits :5000 directly, and for deployment where the two are real domains.)
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      // `origin` is undefined for requests that have no Origin header at all —
+      // curl, Postman, server-to-server calls, and health checks. Those are not
+      // browser requests, so the same-origin policy was never protecting them
+      // and rejecting them would only break tooling. CORS is a browser
+      // mechanism; it is not, and cannot be, general API authorisation.
+      if (!origin) return callback(null, true);
+
+      if (config.corsAllowedOrigins.includes(origin)) return callback(null, true);
+
+      // Deny by NOT allowing, rather than by passing an error: the browser will
+      // block the response either way, and this keeps a rejected origin out of
+      // the error-handler path where it would log noise on every preflight.
+      return callback(null, false);
+    },
+    // Tells the browser it may send cookies and read the response. This is the
+    // server half of the client's `credentials: "include"`; both are required.
+    credentials: true,
+  })
+);
 
 // 2) JSON body parser, built into Express since 4.16. Raw HTTP request bodies
 //    arrive as a stream of bytes; nothing parses them automatically. This
@@ -210,6 +219,22 @@ app.use(cors());
 //    shape that response. Form posts (`application/x-www-form-urlencoded`) need
 //    a separate `express.urlencoded()` — this one ignores them.
 app.use(express.json());
+
+// 3) Cookie parser. Turns the raw `Cookie: a=1; b=2` request header into the
+//    object `req.cookies = { a: '1', b: '2' }`. Registered here, before any
+//    route, because POST /api/auth/refresh and the Google callback both read
+//    cookies and would otherwise see `req.cookies` as undefined.
+//
+//    Note this only READS cookies. Writing them is res.cookie(), which Express
+//    provides on its own and needs no middleware — see src/lib/session.js,
+//    where all the cookie flags are set in one place.
+//
+//    No secret is passed to cookieParser() because nothing here uses SIGNED
+//    cookies. Signing detects tampering with a value the client can see; our
+//    refresh token is 256 bits of unguessable randomness that is checked
+//    against the store on every use, so a tampered value simply does not match
+//    anything. Signing it would add a moving part and prove nothing extra.
+app.use(cookieParser());
 
 // -----------------------------------------------------------------------------
 // ROUTES
@@ -252,6 +277,55 @@ app.get('/api/health', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
+// FEATURE ROUTERS
+// -----------------------------------------------------------------------------
+// `app.use(prefix, router)` MOUNTS a router: every path inside the router is
+// interpreted relative to the prefix, so authRouter's '/login' is served at
+// '/api/auth/login'. That is why nothing inside src/routes/ repeats the '/api'
+// prefix — it is written once, here, and the routers stay relocatable.
+//
+// Keeping the prefix in this file and the handlers in theirs is the whole point
+// of the split: this file answers "what URLs exist?", and each router answers
+// "what happens at them?". server.js stays readable as the map of the API even
+// once there are twenty routers.
+
+// Email + password. The AUTH CORE — this works with no Google config at all.
+app.use('/api/auth', authRouter);
+
+// Google sign-in: OPTIONAL and ADDITIVE, never a replacement for the above.
+//
+// Mounted at the same '/api/auth' prefix but on a deeper path, so the router's
+// '/' becomes GET /api/auth/google and its '/callback' becomes
+// GET /api/auth/google/callback.
+//
+// ORDER MATTERS AND IS SAFE HERE: authRouter is registered first, but it
+// declares no '/google' path, so Express falls through to this one. If a
+// '/google' were ever added to authRouter it would win and this router would go
+// dark — a genuinely confusing bug, so keep the two path sets disjoint.
+//
+// The path is fixed by the frontend: googleAuthorizeUrl() in
+// frontend/src/lib/api.ts returns `${API_BASE}/api/auth/google`. This matches
+// it exactly, so no frontend change is needed to light the button up.
+app.use('/api/auth/google', googleAuthRouter);
+
+// -----------------------------------------------------------------------------
+// FALLBACKS — must be registered LAST
+// -----------------------------------------------------------------------------
+// Express matches in registration order, so these have to come after every real
+// route. Move them above the routers and `notFound` swallows the entire API.
+
+// Any request no route above claimed. Answers JSON rather than Express's
+// built-in HTML 404, because the frontend's api.ts parses error bodies as JSON.
+app.use(notFound);
+
+// The error handler. Recognised by Express ONLY because it declares four
+// parameters — see the comment on it in middleware/errorHandler.js. Every
+// throw and every next(err) from anywhere above ends up here, which is what
+// makes "no stack traces leak to clients" enforceable in one place instead of
+// being a rule everyone has to remember.
+app.use(errorHandler);
+
+// -----------------------------------------------------------------------------
 // START LISTENING
 // -----------------------------------------------------------------------------
 
@@ -281,4 +355,9 @@ app.listen(PORT, () => {
   // small kindness: it is the signal in the terminal that boot succeeded, and
   // nodemon reprints it after every restart.
   console.log(`Backend server is running on http://localhost:${PORT}`);
+  // One line naming the configuration this process actually booted with, so a
+  // misconfiguration is visible immediately rather than at the first failed
+  // login. describeConfig() reports only whether each secret is PRESENT and
+  // never its value — logs get shipped, pasted into issues and screenshotted.
+  console.log(`[config] ${describeConfig()}`);
 });

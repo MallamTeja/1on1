@@ -151,7 +151,7 @@ The important mechanical detail: **declaring a `permissions` block replaces the 
 
 **`matrix.include`** — one leg per (language, build-mode) pair:
 
-- **`language: javascript-typescript`** — one CodeQL extractor covers JavaScript *and* TypeScript together, including `.jsx` and `.tsx`. That single value covers everything analysable in this repo: `backend/src/server.js` and the frontend's `app.jsx`, `main.jsx`, and `src/pages/*.jsx`. The other accepted values, per the comments in the file itself, are `actions`, `c-cpp`, `csharp`, `go`, `java-kotlin`, `python`, `ruby`, `rust`, and `swift`.
+- **`language: javascript-typescript`** — one CodeQL extractor covers JavaScript *and* TypeScript together, including `.jsx` and `.tsx`. That single value covers everything analysable in this repo: `backend/src/server.js` and the frontend's `app.jsx`, `main.jsx`, `src/pages/*.jsx`, and — since the 2026-09-05 TypeScript port — `src/pages/*.tsx`, `src/components/*.tsx` and `src/lib/*.ts`. No extractor change was needed, which is the point of the combined `javascript-typescript` value. The other accepted values, per the comments in the file itself, are `actions`, `c-cpp`, `csharp`, `go`, `java-kotlin`, `python`, `ruby`, `rust`, and `swift`.
 - **`build-mode: none`** — no build step is needed to produce the CodeQL database.
 
 **Why `build-mode` exists.** CodeQL builds its database from source, but *how* it gets complete source depends on the language:

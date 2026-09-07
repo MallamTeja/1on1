@@ -1,0 +1,565 @@
+/* ==========================================================================
+   1on1 — design tokens and shared primitives.
+
+   The product's primitive is the session: a bounded block of someone's time.
+   So the visual system is built out of time — monospaced clock labels, tabular
+   numerals, hairlines that read as calendar gridlines, and one repeated
+   element (the "slot block") that carries a duration on its left edge.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* Ground and ink — neutrals biased slightly green-cool, never pure grey. */
+  --ground: #f1f4f2;
+  --ground-sunk: #e7ebe9;
+  --surface: #ffffff;
+  --surface-2: #f7f9f8;
+  --line: #d2dad7;
+  --line-soft: #e3e9e6;
+  --ink: #121716;
+  --ink-2: #4d5a57;
+  --ink-3: #7d8985;
+
+  /* Accents: spruce is the brand and the confirmed state — the good state is
+     the brand state. Clay marks paid and pending. Brick marks cancelled. */
+  --spruce: #14564a;
+  --spruce-deep: #0d3f36;
+  --spruce-lift: #1c6f5f;
+  --spruce-tint: #dfeae6;
+  --spruce-glow: #8fd3c1;
+  --clay: #97591f;
+  --clay-tint: #f3e7d8;
+  --brick: #8c3a2e;
+  --brick-tint: #f5e2de;
+
+  /* On dark spruce panels. */
+  --on-dark: #eaf1ee;
+  --on-dark-2: #9db8b0;
+
+  /* Type */
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --step-display: clamp(2.6rem, 4.4vw, 4rem);
+  --step-h2: clamp(1.9rem, 2.6vw, 2.5rem);
+  --step-h3: 1.4rem;
+  --step-title: 1.0625rem;
+  --step-body: 0.9375rem;
+  --step-small: 0.8125rem;
+  --step-label: 0.6875rem;
+
+  /* Rhythm — 4px base. Radii stay tight; this is a calendar, not a bubble. */
+  --r-sm: 3px;
+  --r-md: 5px;
+  --r-lg: 8px;
+  --shell: 1240px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  /* Off-canvas fixed panels (the assistant drawer, etc.) still count toward
+     the page's scrollable area even when translated past the viewport edge,
+     which would otherwise let a phone-width page scroll sideways onto blank
+     space. Nothing in this layout scrolls horizontally on purpose. */
+  overflow-x: hidden;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--step-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-stretch: 115%;
+  letter-spacing: -0.018em;
+  line-height: 1.06;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: var(--spruce);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--spruce-deep);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--spruce);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Shared primitives — every class here is prefixed ui- so page stylesheets
+   can never collide with them on specificity.
+   -------------------------------------------------------------------------- */
+
+.ui-shell {
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* Monospaced eyebrow / clock label. The system's smallest unit of voice. */
+.ui-label {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--step-label);
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ui-num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full-bleed hairline — the page's calendar gridline. */
+.ui-rule {
+  height: 1px;
+  border: 0;
+  margin: 0;
+  background: var(--line);
+}
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--spruce);
+  color: #fff;
+  font-family: var(--body);
+  font-size: var(--step-body);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.ui-btn:hover {
+  background: var(--spruce-deep);
+  color: #fff;
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.ui-btn--ghost:hover {
+  background: var(--surface);
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+
+.ui-btn--block {
+  width: 100%;
+}
+
+.ui-btn--sm {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: var(--step-small);
+}
+
+/* Status pill: state reads as form as well as colour. */
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: var(--step-label);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.ui-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.ui-pill--confirmed {
+  border-color: color-mix(in oklab, var(--spruce) 30%, var(--line));
+  background: var(--spruce-tint);
+  color: var(--spruce);
+}
+
+.ui-pill--pending {
+  border-color: color-mix(in oklab, var(--clay) 28%, var(--line));
+  background: var(--clay-tint);
+  color: var(--clay);
+}
+
+.ui-pill--free {
+  border-color: color-mix(in oklab, var(--spruce) 24%, var(--line));
+  color: var(--spruce);
+}
+
+.ui-pill--paid {
+  border-color: color-mix(in oklab, var(--clay) 24%, var(--line));
+  color: var(--clay);
+}
+
+/* ---- The signature element: a slot block. ---------------------------------
+   A bounded piece of time. The left edge carries the clock; a 3px stripe
+   encodes what kind of slot it is. Used on every screen in the product. */
+
+.ui-slot {
+  display: flex;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px 12px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  text-align: left;
+  overflow: hidden;
+}
+
+.ui-slot__edge {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 78px;
+  padding: 0 14px 0 17px;
+  border-left: 3px solid var(--spruce);
+  margin-left: -1px;
+}
+
+.ui-slot__time {
+  font-family: var(--mono);
+  font-size: var(--step-small);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.ui-slot__dur {
+  font-family: var(--mono);
+  font-size: var(--step-label);
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.ui-slot__body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ui-slot__title {
+  font-size: var(--step-body);
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+}
+
+.ui-slot__meta {
+  font-size: var(--step-small);
+  color: var(--ink-2);
+}
+
+.ui-slot__badge {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.ui-slot__trailing {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+}
+
+.ui-slot--pending .ui-slot__edge {
+  border-left-color: var(--clay);
+}
+
+.ui-slot--muted {
+  background: var(--surface-2);
+}
+
+.ui-slot--muted .ui-slot__edge {
+  border-left-color: var(--line);
+}
+
+.ui-slot--dark {
+  border-color: rgba(143, 211, 193, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ui-slot--dark .ui-slot__edge {
+  border-left-color: var(--spruce-glow);
+}
+
+.ui-slot--dark .ui-slot__time,
+.ui-slot--dark .ui-slot__title {
+  color: var(--on-dark);
+}
+
+.ui-slot--dark .ui-slot__dur,
+.ui-slot--dark .ui-slot__meta {
+  color: var(--on-dark-2);
+}
+
+/* ---- Wordmark ---- */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--spruce);
+}
+
+.brand:hover {
+  color: var(--spruce-deep);
+}
+
+.brand__mark {
+  flex: 0 0 auto;
+  border-radius: var(--r-sm);
+}
+
+.brand__word {
+  font-family: var(--display);
+  font-size: 1.28rem;
+  font-weight: 800;
+  font-stretch: 112%;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.brand__join {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--spruce);
+}
+
+.brand--dark {
+  color: var(--spruce-glow);
+}
+
+.brand--dark:hover {
+  color: #fff;
+}
+
+.brand--dark .brand__word {
+  color: var(--on-dark);
+}
+
+.brand--dark .brand__join {
+  color: var(--spruce-glow);
+}
+
+/* ---- Forms ---- */
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ui-field__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ui-field__label {
+  font-family: var(--mono);
+  font-size: var(--step-label);
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.ui-field__input {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: var(--step-body);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ui-field__input::placeholder {
+  color: var(--ink-3);
+}
+
+.ui-field__input:focus {
+  outline: none;
+  border-color: var(--spruce);
+  box-shadow: 0 0 0 3px var(--spruce-tint);
+}
+
+.ui-field__input--invalid {
+  border-color: var(--brick);
+}
+
+.ui-field__input--invalid:focus {
+  border-color: var(--brick);
+  box-shadow: 0 0 0 3px var(--brick-tint);
+}
+
+.ui-field__hint {
+  font-size: var(--step-small);
+  color: var(--ink-3);
+}
+
+/* Inline field error. Carries the brick stripe so it reads as the same system
+   as a cancelled session, not as a generic browser warning. */
+.ui-field__error {
+  display: flex;
+  gap: 8px;
+  padding-left: 9px;
+  border-left: 2px solid var(--brick);
+  font-size: var(--step-small);
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--brick);
+}
+
+/* A screen quietly saying its data is a stand-in rather than live — the
+   feed and search endpoints are still landing, per lib/samples.ts. Clay is
+   the system's "pending / provisional" tone, so this borrows it. */
+.ui-notice {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 11px 14px;
+  border: 1px dashed color-mix(in oklab, var(--clay) 38%, var(--line));
+  border-radius: var(--r-md);
+  background: var(--clay-tint);
+  font-size: var(--step-small);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.ui-notice strong {
+  color: var(--clay);
+}
+
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Shared responsive behaviour for the primitives. Page stylesheets handle
+   their own layout; this is only what every screen shares.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  .ui-shell {
+    padding: 0 20px;
+  }
+
+  /* Thumb-sized controls. The compact button is 34px on a desktop pointer,
+     which is too small to hit reliably on a phone. */
+  .ui-btn--sm {
+    min-height: 44px;
+    padding: 0 16px;
+  }
+
+  .ui-slot__edge {
+    min-width: 70px;
+    padding: 0 12px 0 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
