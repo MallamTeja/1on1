@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint . --max-warnings 0",
+    "check:links": "node scripts/check-links.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
