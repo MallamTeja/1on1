@@ -23,8 +23,8 @@ export class HttpError extends Error {
    * @param {string} message Safe to show a user. Never interpolate a secret,
    *                         a stack trace, or a raw upstream error in here.
    */
-  constructor(status, message) {
-    super(message);
+  constructor(status, message, options = {}) {
+    super(message, options);
     this.name = 'HttpError';
     this.status = status;
     /**
@@ -35,6 +35,9 @@ export class HttpError extends Error {
      * admin)` you would hand that string straight to the browser.
      */
     this.expose = true;
+    if (options && options.cause !== undefined) {
+      this.cause = options.cause;
+    }
   }
 }
 

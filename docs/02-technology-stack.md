@@ -17,37 +17,29 @@
 -   Express
 -   TypeScript
 
-### Database
+### Database & Hosting
 
--   **Amazon RDS for PostgreSQL** (managed, `ap-south-1`)
+-   **PostgreSQL 16/17 on AWS Lightsail VPS** (Mumbai, `ap-south-1`)
+-   **Frontend Hosting:** Vercel (Hobby Tier, $0/mo)
 
-> **DECIDED 2026-09-06 — this line is canonical.** Every other database mention
-> in the docs points back here.
+> **DECIDED 2026-09-08 — this line is canonical.** (Supersedes the 2026-09-06 RDS proposal).
 >
-> **The choice: RDS PostgreSQL.** Reasoning:
+> **The choice: PostgreSQL on AWS Lightsail VPS ($5.00/mo).** Reasoning:
 >
 > -   The data is **join-heavy** — follows, session offerings, availability,
->     bookings and payments are all relational, and the core queries traverse
->     several tables at once. A document store would denormalise the same joins
->     into application code.
-> -   The booking flow needs **transactional guarantees the schema itself can
->     enforce**. Postgres exclusion constraints (`EXCLUDE USING gist`) make
->     double-booking structurally impossible; see
->     `docs/architecture/01-data-model.md` §7.1.
-> -   `1on1_sb` already **proved a Postgres schema for this exact product** —
->     working Flyway migrations against a live database. The data model is
->     ported from it (the Java is not).
-> -   DynamoDB was considered and rejected: cheaper at idle, but a poor fit for
->     the relational queries this product is made of.
+>     bookings and payments are relational. The engine is strictly PostgreSQL.
+> -   **Cost:** Flat $5.00/mo (~₹470 INR/mo) with included static IPv4 and SSD,
+>     guaranteeing spend stays well below Teja's ₹800/mo budget alert.
+> -   **Co-location:** Express backend and PostgreSQL run on the same VPS,
+>     yielding sub-millisecond query latency over `localhost` and zero open DB ports
+>     exposed to the public internet.
+> -   **Media storage:** Binary images and videos are stored in **AWS S3** via
+>     presigned upload URLs; only URLs/metadata reside in PostgreSQL.
+> -   **Frontend integration:** Vercel proxies `/api/*` requests to the Lightsail
+>     public IP via `frontend/vercel.json` rewrites.
 >
-> **Not provisioned yet.** An AWS CLI audit on 2026-09-06 confirmed the account
-> holds *zero* databases of any kind across all 17 regions, and the backend has
-> no database driver. Until provisioning, persistence stays behind the
-> repository seam in `backend/src/repositories/`.
->
-> -   Schema design → `docs/architecture/01-data-model.md`
-> -   Provisioning plan and cost → `docs/deployment/11-rds-provisioning-plan.md`
-> -   Account inventory → `docs/deployment/10-aws-inventory-2026-09-06.md`
+> Full ADR: `docs/decisions/2026-09-08-hosting-settled-lightsail-vps-and-vercel.md`
+> Schema design: `docs/architecture/01-data-model.md`
 
 There is no MongoDB in this project. The stack is Node.js end to end — no Java,
 no Spring Boot, no JVM component of any kind.

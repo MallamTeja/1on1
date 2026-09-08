@@ -1,5 +1,8 @@
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+// useSearchParams is the router's own read of the query string. Reading
+// window.location.search would work today, but it bypasses the router, so a
+// future client-side navigation to /login?error=... could render stale state.
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthShell } from "../components/AuthShell";
 import { SlotBlock } from "../components/SlotBlock";
 import { TextField } from "../components/TextField";
@@ -28,6 +31,49 @@ function check(values: Fields): Errors {
   };
 }
 
+/**
+ * Google sign-in cannot fail with a JSON body — the browser is mid-navigation,
+ * so backend/src/routes/googleAuth.js sends it back to /login?error=<code>.
+ * These are the only four codes it emits (failRedirect call sites in that
+ * file); the messages are deliberately vaguer than the server log, because a
+ * precise one would let someone probing with their own Google account learn
+ * which of our users exist.
+ */
+// Keyed by plain string, not a union of the four codes: the key arrives from
+// the URL, so anything can show up, and a union type would promise otherwise.
+const OAUTH_REASONS: Record<string, string> = {
+  // The person closed Google's consent screen themselves, so no error tone —
+  // confirm what happened and name both ways forward.
+  google_cancelled:
+    "Google sign-in was cancelled. You can try again, or use your email and password.",
+  // One message for four server-side branches: missing handshake cookies, a
+  // state mismatch, a failed code exchange or id_token check, and an id_token
+  // with no email. Collapsing them is deliberate — telling a prober which step
+  // broke hands them a map of the handshake. The server log keeps the detail.
+  google_failed:
+    "Google didn't complete the sign-in. Starting again usually clears it.",
+  // Points at Google, not us, because only Google can verify a Google address.
+  // We refuse unverified emails so nobody can sign in as an address they merely
+  // typed into a Google account.
+  google_email_unverified:
+    "Google hasn't verified that account's email address. Verify it with Google, or log in with your email and password.",
+  // Server-side misconfiguration (the backend answers 503), nothing the person
+  // did. The second sentence is the additive-auth contract made visible:
+  // Google being down never blocks password login.
+  google_unavailable:
+    "Google sign-in isn't available on this server right now. Your email and password still work.",
+};
+
+// Returns null rather than "" so the caller can seed formError directly — the
+// JSX already treats null as "no banner", and this keeps that contract intact.
+function oauthReason(code: string | null): string | null {
+  // No ?error= at all is the normal case: a plain visit to /login.
+  if (!code) return null;
+  // An unknown code means the backend grew a new failure before this map
+  // learned it. A generic line beats silently dropping a real error.
+  return OAUTH_REASONS[code] ?? "Google sign-in didn't work. Try again, or use your email and password.";
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const { setSession } = useAuth();
@@ -36,7 +82,19 @@ export default function Login() {
   const [touched, setTouched] = useState<Partial<Record<keyof Fields, boolean>>>(
     {},
   );
-  const [formError, setFormError] = useState<string | null>(null);
+  // Only the getter is destructured: this page reads the URL and never writes
+  // it, so there is nothing to strip — see the initialiser note below.
+  const [params] = useSearchParams();
+  // Seeded once, on mount: a bounced Google handshake is the reason this page
+  // is being shown, so it belongs in the same banner a failed password login
+  // uses. handleSubmit's setFormError(null) clears it, which is right — a new
+  // attempt supersedes the old failure.
+  // The arrow makes this a lazy initialiser: React runs it on the first render
+  // only, so ?error= cannot resurrect the banner after a submit has cleared
+  // it, and no useEffect is needed to scrub the param from the URL.
+  const [formError, setFormError] = useState<string | null>(() =>
+    oauthReason(params.get("error")),
+  );
   const [pending, setPending] = useState(false);
 
   const emailRef = useRef<HTMLInputElement>(null);

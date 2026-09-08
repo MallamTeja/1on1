@@ -59,6 +59,21 @@
     -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
+      SEO + social preview. The only metadata in this file a crawler or a
+      link-unfurler reads. One sentence: search engines truncate around 155
+      characters, and this is what shows under the title in a result and in a
+      Slack/WhatsApp/X card.
+
+      No og:image / twitter:card on purpose: unfurlers want a raster image and
+      the repo ships none (the favicon is an SVG), and every unfurler falls back
+      to this description when the Open Graph tags are absent. `name=` rather
+      than `property=` because this is a standard HTML meta, not an RDFa one.
+    -->
+    <meta
+      name="description"
+      content="1on1 is an open professional network where you follow anyone, engage with their work, and request a free or paid 1:1 or group session."
+    />
+    <!--
       WEBFONTS. The two preconnects open the TLS handshake to Google's font
       hosts before the stylesheet below is even parsed, which removes a round
       trip from the critical path.
@@ -79,8 +94,15 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400..700&display=swap"
     />
-    <!-- Text shown in the browser tab / window title bar / bookmark name. -->
-    <title>1on1 App</title>
+    <!--
+      Text shown in the browser tab / window title bar / bookmark name, and the
+      headline of a search result. Brand first so a narrow tab still reads
+      "1on1" when the rest is clipped; the tagline after the dash is the
+      product's one-line positioning, kept under ~60 characters because search
+      engines truncate titles around there. A literal U+2014 em dash rather than
+      &mdash; — the file is UTF-8 and the entity would only be noise.
+    -->
+    <title>1on1 — book the time, not just the connection</title>
   </head>
   <body>
     <!--

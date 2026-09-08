@@ -55,10 +55,9 @@ export function AuthShell({
           </div>
 
           {/* A full-page navigation, not a fetch — Google has to see the
-              browser. The backend would finish by redirecting back to this
-              origin with the refresh cookie set and no token in the URL.
-              See the TODO on googleAuthorizeUrl(): the Node backend does not
-              serve this route yet. */}
+              browser. The backend sets the refresh cookie on its callback and
+              returns here with no token in the URL; a failure comes back as
+              /login?error=<code>. */}
           <button
             type="button"
             className="au-google"

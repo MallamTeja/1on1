@@ -8,9 +8,9 @@
  *
  * Scope: this is the auth surface only. More calls get added as features land.
  *
- * NOTE: `1on1/backend` currently exposes only `GET /api/health` — none of the
- * endpoints below exist yet. That is expected; the frontend lands first and the
- * pages stay walkable through the NetworkError path.
+ * The Node backend implements every endpoint below (see backend/src/routes/).
+ * The NetworkError path still matters: it is what keeps the pages walkable when
+ * no API is running alongside the dev server.
  */
 import type { AuthResponse } from "./types";
 
@@ -133,12 +133,14 @@ export function registerAccount(input: {
 
 /**
  * The OAuth entry point. Hitting it is a full-page navigation, not a fetch —
- * Google has to see the browser. The backend would finish by redirecting back
- * to this origin with the refresh cookie set and no token in the URL.
+ * Google has to see the browser. The backend redirects to Google, handles the
+ * callback at GET /api/auth/google/callback, sets the same HTTP-only refresh
+ * cookie a password login sets, and returns the browser to this origin with no
+ * token in the URL. AuthProvider's one refreshSession() on mount picks it up.
  *
- * TODO: not implemented on the Node backend yet — 1on1/backend currently
- * exposes only GET /api/health. Google OAuth is documented as optional/additive
- * and must not replace email+password auth.
+ * A failed handshake lands on /login?error=<code> instead — the codes are
+ * listed in Login.tsx. Google sign-in is optional and additive: the backend
+ * answers 503 when it is unconfigured, and email+password is unaffected.
  */
 export function googleAuthorizeUrl(): string {
   return `${API_BASE}/api/auth/google`;

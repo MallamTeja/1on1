@@ -524,7 +524,6 @@ export default function Landing() {
           <nav className="ld-foot__links" aria-label="Footer">
             <Link to="/login">Log in</Link>
             <Link to="/register">Create profile</Link>
-            <Link to="/dashboard">Dashboard</Link>
           </nav>
         </div>
       </footer>
